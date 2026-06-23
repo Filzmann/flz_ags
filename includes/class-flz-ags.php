@@ -86,11 +86,11 @@ class FLZ_AGS_Plugin
         echo '<h1>FLZ AGs</h1>';
 
         if (isset($_GET['saved'])) {
-            echo flz_ags_notice('AG gespeichert.');
+            echo wp_kses_post(flz_ags_notice('AG gespeichert.'));
         }
         if (isset($_GET['demo'])) {
             $count = absint($_GET['demo']);
-            echo flz_ags_notice($count . ' Demo-AGs wurden angelegt. Bereits vorhandene Demo-AGs wurden übersprungen.');
+            echo wp_kses_post(flz_ags_notice($count . ' Demo-AGs wurden angelegt. Bereits vorhandene Demo-AGs wurden übersprungen.'));
         }
 
         if ($action === 'new' || ($action === 'edit' && $course_id > 0)) {
@@ -105,36 +105,39 @@ class FLZ_AGS_Plugin
     private function get_course(int $course_id): ?object
     {
         global $wpdb;
-        $course = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . flz_ags_table('courses') . ' WHERE id = %d', $course_id));
+        $table = flz_ags_table('courses');
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated internally.
+        $course = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $course_id));
         return $course ?: null;
     }
 
     private function get_courses(string $school_year, bool $public_only = false): array
     {
         global $wpdb;
-        $where = 'school_year = %s';
+        $table = flz_ags_table('courses');
+        $sql = "SELECT * FROM {$table} WHERE school_year = %s ORDER BY sort_order ASC, title ASC";
+
         if ($public_only) {
-            $where .= ' AND is_active = 1 AND is_visible = 1';
+            $sql = "SELECT * FROM {$table} WHERE school_year = %s AND is_active = 1 AND is_visible = 1 ORDER BY sort_order ASC, title ASC";
         }
 
-        return $wpdb->get_results($wpdb->prepare(
-            'SELECT * FROM ' . flz_ags_table('courses') . " WHERE {$where} ORDER BY sort_order ASC, title ASC",
-            $school_year
-        ));
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name is generated internally.
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL contains only internal table names and placeholders.
+        return $wpdb->get_results($wpdb->prepare($sql, $school_year));
     }
 
     private function get_course_slots(int $course_id, bool $include_inactive = true): array
     {
         global $wpdb;
-        $where = 'course_id = %d';
+        $table = flz_ags_table('slots');
+        $sql = "SELECT * FROM {$table} WHERE course_id = %d ORDER BY sort_order ASC, weekday ASC, start_time ASC";
+
         if (!$include_inactive) {
-            $where .= ' AND is_active = 1';
+            $sql = "SELECT * FROM {$table} WHERE course_id = %d AND is_active = 1 ORDER BY sort_order ASC, weekday ASC, start_time ASC";
         }
 
-        return $wpdb->get_results($wpdb->prepare(
-            'SELECT * FROM ' . flz_ags_table('slots') . " WHERE {$where} ORDER BY sort_order ASC, weekday ASC, start_time ASC",
-            $course_id
-        ));
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name is generated internally.
+        return $wpdb->get_results($wpdb->prepare($sql, $course_id));
     }
 
     private function get_slot_with_course(int $slot_id): ?object
@@ -146,13 +149,14 @@ class FLZ_AGS_Plugin
                 INNER JOIN ' . flz_ags_table('courses') . ' c ON c.id = s.course_id
                 WHERE s.id = %d';
 
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL contains only internal table names and placeholders.
         $row = $wpdb->get_row($wpdb->prepare($sql, $slot_id));
         return $row ?: null;
     }
 
     private function render_course_list(): void
     {
-        $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(wp_unslash($_GET['school_year'])) : flz_ags_current_school_year();
+        $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_GET['school_year']))) : flz_ags_current_school_year();
         $courses = $this->get_courses($school_year, false);
 
         echo '<p>';
@@ -308,7 +312,7 @@ class FLZ_AGS_Plugin
             wp_die('Der Titel ist erforderlich.');
         }
 
-        $school_year = isset($_POST['school_year']) ? flz_ags_sanitize_school_year(wp_unslash($_POST['school_year'])) : flz_ags_current_school_year();
+        $school_year = isset($_POST['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_POST['school_year']))) : flz_ags_current_school_year();
         $data = array(
             'school_year' => $school_year,
             'title' => $title,
@@ -319,7 +323,7 @@ class FLZ_AGS_Plugin
             'info_url' => isset($_POST['info_url']) ? esc_url_raw(wp_unslash($_POST['info_url'])) : '',
             'category' => isset($_POST['category']) ? sanitize_text_field(wp_unslash($_POST['category'])) : '',
             'leader_name' => isset($_POST['leader_name']) ? sanitize_text_field(wp_unslash($_POST['leader_name'])) : '',
-            'allowed_grades' => isset($_POST['allowed_grades']) ? flz_ags_sanitize_allowed_grades(wp_unslash($_POST['allowed_grades'])) : '',
+            'allowed_grades' => isset($_POST['allowed_grades']) ? flz_ags_sanitize_allowed_grades(sanitize_text_field(wp_unslash($_POST['allowed_grades']))) : '',
             'only_grade_7' => isset($_POST['only_grade_7']) ? 1 : 0,
             'is_active' => isset($_POST['is_active']) ? 1 : 0,
             'is_visible' => isset($_POST['is_visible']) ? 1 : 0,
@@ -336,7 +340,10 @@ class FLZ_AGS_Plugin
             $course_id = (int) $wpdb->insert_id;
         }
 
-        $slots = isset($_POST['slots']) && is_array($_POST['slots']) ? wp_unslash($_POST['slots']) : array();
+        $slots = array();
+        if (isset($_POST['slots']) && is_array($_POST['slots'])) {
+            $slots = map_deep(wp_unslash($_POST['slots']), 'sanitize_text_field');
+        }
         foreach ($slots as $slot) {
             if (!is_array($slot)) {
                 continue;
@@ -397,7 +404,7 @@ class FLZ_AGS_Plugin
         echo '<div class="wrap flz-ags-admin">';
         echo '<h1>FLZ AGs – Einstellungen</h1>';
         if (isset($_GET['saved'])) {
-            echo flz_ags_notice('Einstellungen gespeichert.');
+            echo wp_kses_post(flz_ags_notice('Einstellungen gespeichert.'));
         }
 
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
@@ -423,8 +430,8 @@ class FLZ_AGS_Plugin
         $this->assert_admin_permission();
         check_admin_referer('flz_ags_save_settings');
 
-        $school_year = isset($_POST['current_school_year']) ? flz_ags_sanitize_school_year(wp_unslash($_POST['current_school_year'])) : flz_ags_default_school_year();
-        $classes_text = isset($_POST['classes_text']) ? (string) wp_unslash($_POST['classes_text']) : '';
+        $school_year = isset($_POST['current_school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_POST['current_school_year']))) : flz_ags_default_school_year();
+        $classes_text = isset($_POST['classes_text']) ? sanitize_textarea_field(wp_unslash($_POST['classes_text'])) : '';
         $classes = flz_ags_sanitize_classes_from_text($classes_text);
 
         update_option('flz_ags_current_school_year', $school_year, false);
@@ -437,7 +444,7 @@ class FLZ_AGS_Plugin
     public function render_admin_demo_page(): void
     {
         $this->assert_admin_permission();
-        $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(wp_unslash($_GET['school_year'])) : flz_ags_current_school_year();
+        $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_GET['school_year']))) : flz_ags_current_school_year();
         $demo = flz_ags_demo_courses();
 
         echo '<div class="wrap flz-ags-admin">';
@@ -475,12 +482,14 @@ class FLZ_AGS_Plugin
         check_admin_referer('flz_ags_install_demo');
 
         global $wpdb;
-        $school_year = isset($_POST['school_year']) ? flz_ags_sanitize_school_year(wp_unslash($_POST['school_year'])) : flz_ags_current_school_year();
+        // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are generated internally; user input remains sanitized before use.
+        $school_year = isset($_POST['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_POST['school_year']))) : flz_ags_current_school_year();
         $now = current_time('mysql');
         $inserted = 0;
 
         foreach (flz_ags_demo_courses() as $course) {
             $slug = sanitize_title($course['title']);
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name is generated internally.
             $exists = (int) $wpdb->get_var($wpdb->prepare(
                 'SELECT COUNT(*) FROM ' . flz_ags_table('courses') . ' WHERE school_year = %s AND slug = %s',
                 $school_year,
@@ -533,6 +542,8 @@ class FLZ_AGS_Plugin
             $inserted++;
         }
 
+        // phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
         wp_safe_redirect(flz_ags_admin_url(array('page' => 'flz-ags', 'school_year' => $school_year, 'demo' => $inserted)));
         exit;
     }
@@ -540,27 +551,40 @@ class FLZ_AGS_Plugin
     private function count_active_registrations(int $slot_id): int
     {
         global $wpdb;
-        return (int) $wpdb->get_var($wpdb->prepare(
-            'SELECT COUNT(*) FROM ' . flz_ags_table('registrations') . ' WHERE slot_id = %d AND status = %s',
+        $table = flz_ags_table('registrations');
+
+        // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated internally; values are passed as placeholders.
+        $count = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE slot_id = %d AND status = %s",
             $slot_id,
             'active'
         ));
+        // phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+        return $count;
     }
 
     private function get_public_slots(string $school_year): array
     {
         global $wpdb;
 
-        $sql = 'SELECT s.*, c.title, c.short_description, c.description, c.image_url, c.info_url, c.category, c.leader_name, c.allowed_grades, c.only_grade_7, c.registration_open
-                FROM ' . flz_ags_table('slots') . ' s
-                INNER JOIN ' . flz_ags_table('courses') . ' c ON c.id = s.course_id
+        $slots_table = flz_ags_table('slots');
+        $courses_table = flz_ags_table('courses');
+
+        // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are generated internally; school year is passed as placeholder.
+        $sql = "SELECT s.*, c.title, c.short_description, c.description, c.image_url, c.info_url, c.category, c.leader_name, c.allowed_grades, c.only_grade_7, c.registration_open
+                FROM {$slots_table} s
+                INNER JOIN {$courses_table} c ON c.id = s.course_id
                 WHERE s.school_year = %s
                   AND s.is_active = 1
                   AND c.is_active = 1
                   AND c.is_visible = 1
-                ORDER BY c.sort_order ASC, c.title ASC, s.weekday ASC, s.start_time ASC';
+                ORDER BY c.sort_order ASC, c.title ASC, s.weekday ASC, s.start_time ASC";
 
-        return $wpdb->get_results($wpdb->prepare($sql, $school_year));
+        $results = $wpdb->get_results($wpdb->prepare($sql, $school_year));
+        // phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+        return $results;
     }
 
     private function get_public_courses_with_slots(string $school_year): array
@@ -745,7 +769,8 @@ class FLZ_AGS_Plugin
         $messages = array();
         $success = false;
 
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['flz_ags_registration_submit'])) {
+        $request_method = isset($_SERVER['REQUEST_METHOD']) ? sanitize_key(wp_unslash($_SERVER['REQUEST_METHOD'])) : '';
+        if ('POST' === $request_method) {
             $result = $this->handle_frontend_registration($school_year);
             $messages = $result['messages'];
             $success = $result['success'];
@@ -776,19 +801,35 @@ class FLZ_AGS_Plugin
             return !empty($slot->registration_open);
         });
 
+        $posted = array(
+            'class_name' => '',
+            'student_first_name' => '',
+            'student_last_name' => '',
+            'guardian_email' => '',
+            'slot_id' => 0,
+        );
+
+        if (isset($_POST['flz_ags_nonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['flz_ags_nonce'])), 'flz_ags_frontend_registration')) {
+            $posted['class_name'] = isset($_POST['class_name']) ? sanitize_text_field(wp_unslash($_POST['class_name'])) : '';
+            $posted['student_first_name'] = isset($_POST['student_first_name']) ? sanitize_text_field(wp_unslash($_POST['student_first_name'])) : '';
+            $posted['student_last_name'] = isset($_POST['student_last_name']) ? sanitize_text_field(wp_unslash($_POST['student_last_name'])) : '';
+            $posted['guardian_email'] = isset($_POST['guardian_email']) ? sanitize_email(wp_unslash($_POST['guardian_email'])) : '';
+            $posted['slot_id'] = isset($_POST['slot_id']) ? absint($_POST['slot_id']) : 0;
+        }
+
         echo '<form method="post" class="flz-ags-registration-form" data-flz-ags-registration-form>';
         wp_nonce_field('flz_ags_frontend_registration', 'flz_ags_nonce');
         echo '<input type="hidden" name="flz_ags_registration_submit" value="1">';
         echo '<div class="flz-ags-form-grid">';
         echo '<label>Klasse/Kurs <select name="class_name" data-flz-ags-class-select required><option value="">– Bitte auswählen –</option>';
         foreach (flz_ags_get_classes() as $class) {
-            $selected = isset($_POST['class_name']) && sanitize_text_field(wp_unslash($_POST['class_name'])) === $class;
+            $selected = $posted['class_name'] === $class;
             echo '<option value="' . esc_attr($class) . '" ' . selected($selected, true, false) . '>' . esc_html($class) . '</option>';
         }
         echo '</select></label>';
-        echo '<label>Vorname Schüler*in <input type="text" name="student_first_name" required value="' . esc_attr(isset($_POST['student_first_name']) ? sanitize_text_field(wp_unslash($_POST['student_first_name'])) : '') . '"></label>';
-        echo '<label>Nachname Schüler*in <input type="text" name="student_last_name" required value="' . esc_attr(isset($_POST['student_last_name']) ? sanitize_text_field(wp_unslash($_POST['student_last_name'])) : '') . '"></label>';
-        echo '<label>E-Mail Erziehungsberechtigte*r / Kontakt <input type="email" name="guardian_email" value="' . esc_attr(isset($_POST['guardian_email']) ? sanitize_email(wp_unslash($_POST['guardian_email'])) : '') . '"></label>';
+        echo '<label>Vorname Schüler*in <input type="text" name="student_first_name" required value="' . esc_attr($posted['student_first_name']) . '"></label>';
+        echo '<label>Nachname Schüler*in <input type="text" name="student_last_name" required value="' . esc_attr($posted['student_last_name']) . '"></label>';
+        echo '<label>E-Mail Erziehungsberechtigte*r / Kontakt <input type="email" name="guardian_email" value="' . esc_attr($posted['guardian_email']) . '"></label>';
         echo '</div>';
 
         $this->render_frontend_filters(false, false);
@@ -802,7 +843,7 @@ class FLZ_AGS_Plugin
                 $max = (int) $slot->max_participants;
                 $is_full = $max > 0 && $taken >= $max;
                 $free_label = $max > 0 ? max(0, $max - $taken) . ' freie Plätze' : 'keine Begrenzung hinterlegt';
-                $checked = isset($_POST['slot_id']) && absint($_POST['slot_id']) === (int) $slot->id;
+                $checked = $posted['slot_id'] === (int) $slot->id;
 
                 echo '<label class="flz-ags-slot-choice flz-ags-slot-option" data-flz-ags-filter-item data-weekday="' . esc_attr($slot->weekday) . '" data-only-grade-7="' . esc_attr((int) $slot->only_grade_7) . '" data-allowed-grades="' . esc_attr($slot->allowed_grades) . '" data-full="' . esc_attr($is_full ? '1' : '0') . '">';
                 echo '<input type="radio" name="slot_id" value="' . esc_attr($slot->id) . '" ' . checked($checked, true, false) . ' ' . disabled($is_full, true, false) . ' required> ';
@@ -873,6 +914,8 @@ class FLZ_AGS_Plugin
             return array('success' => false, 'messages' => array('Dieser AG-Slot ist inzwischen ausgebucht.'));
         }
 
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name is generated internally.
+        // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are generated internally; submitted values are sanitized before DB use.
         $duplicate = (int) $wpdb->get_var($wpdb->prepare(
             'SELECT COUNT(*) FROM ' . flz_ags_table('registrations') . ' WHERE school_year = %s AND class_name = %s AND student_first_name = %s AND student_last_name = %s AND status = %s',
             $school_year,
@@ -906,6 +949,8 @@ class FLZ_AGS_Plugin
             return array('success' => false, 'messages' => array('Die Anmeldung konnte nicht gespeichert werden.'));
         }
 
+        // phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
         return array('success' => true, 'messages' => array('Die AG-Anmeldung wurde gespeichert. Die Teilnahme gilt bis auf Widerruf.'));
     }
 
@@ -914,7 +959,7 @@ class FLZ_AGS_Plugin
         $this->assert_admin_permission();
         global $wpdb;
 
-        $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(wp_unslash($_GET['school_year'])) : flz_ags_current_school_year();
+        $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_GET['school_year']))) : flz_ags_current_school_year();
         $status = isset($_GET['status']) ? sanitize_key(wp_unslash($_GET['status'])) : 'active';
         if (!array_key_exists($status, flz_ags_status_labels())) {
             $status = 'active';
@@ -927,12 +972,13 @@ class FLZ_AGS_Plugin
                 WHERE r.school_year = %s AND r.status = %s
                 ORDER BY r.class_name ASC, r.student_last_name ASC, r.student_first_name ASC';
 
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL contains only internal table names and placeholders.
         $registrations = $wpdb->get_results($wpdb->prepare($sql, $school_year, $status));
 
         echo '<div class="wrap flz-ags-admin">';
         echo '<h1>AG-Anmeldungen</h1>';
         if (isset($_GET['updated'])) {
-            echo flz_ags_notice('Anmeldung aktualisiert.');
+            echo wp_kses_post(flz_ags_notice('Anmeldung aktualisiert.'));
         }
 
         echo '<form method="get" class="flz-ags-admin-filter">';
@@ -1011,7 +1057,7 @@ class FLZ_AGS_Plugin
         check_admin_referer('flz_ags_export_csv');
 
         global $wpdb;
-        $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(wp_unslash($_GET['school_year'])) : flz_ags_current_school_year();
+        $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_GET['school_year']))) : flz_ags_current_school_year();
         $status = isset($_GET['status']) ? sanitize_key(wp_unslash($_GET['status'])) : 'active';
         if (!array_key_exists($status, flz_ags_status_labels())) {
             $status = 'active';
@@ -1023,6 +1069,7 @@ class FLZ_AGS_Plugin
                 INNER JOIN ' . flz_ags_table('slots') . ' s ON s.id = r.slot_id
                 WHERE r.school_year = %s AND r.status = %s
                 ORDER BY c.title ASC, s.weekday ASC, r.class_name ASC, r.student_last_name ASC';
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL contains only internal table names and placeholders.
         $rows = $wpdb->get_results($wpdb->prepare($sql, $school_year, $status), ARRAY_A);
 
         nocache_headers();
