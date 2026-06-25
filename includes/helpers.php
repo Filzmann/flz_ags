@@ -2,10 +2,72 @@
 
 defined('ABSPATH') || exit;
 
-function flz_ags_table(string $name): string
+// Exception-Texte sind interne Logdaten; HTML-Escaping erfolgt erst an der UI-Grenze.
+// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped
+
+/**
+ * Liefert ausschließlich die manuell benannten Tabellen der Version 0.2.x.
+ * Neue Abfragen verwenden immer die vom Modell abgeleiteten Tabellennamen.
+ */
+function flz_ags_legacy_table(string $name): string
 {
     global $wpdb;
+
+    if (!in_array($name, array('courses', 'slots', 'registrations'), true)) {
+        throw new InvalidArgumentException('Unbekannte alte AG-Tabelle: ' . $name);
+    }
+
     return $wpdb->prefix . 'flz_ag_' . $name;
+}
+
+/**
+ * Protokolliert technische Ursachen ohne sie an Besucher auszugeben.
+ */
+function flz_ags_log_error(Throwable $error, string $context): void
+{
+    $messages = array();
+    $current = $error;
+    do {
+        $messages[] = get_class($current) . ': ' . $current->getMessage();
+        $current = $current->getPrevious();
+    } while ($current instanceof Throwable);
+
+    error_log('[flz_ags] ' . $context . ' | ' . implode(' <- ', $messages));
+}
+
+/**
+ * Liefert sichere Meldungen für bekannte Fehlercodes aus Weiterleitungen.
+ */
+function flz_ags_error_message(string $code): string
+{
+    $messages = array(
+        'save-course' => 'Die AG konnte nicht vollständig gespeichert werden. Es wurden keine Teiländerungen übernommen.',
+        'install-demo' => 'Die Demo-AGs konnten nicht vollständig angelegt werden. Es wurden keine Teiländerungen übernommen.',
+        'update-registration' => 'Die Anmeldung konnte nicht aktualisiert werden.',
+        'export' => 'Der CSV-Export konnte nicht erstellt werden.',
+    );
+
+    return $messages[$code] ?? 'Die angeforderten AG-Daten konnten nicht verarbeitet werden.';
+}
+
+/**
+ * Führt eine interne Weiterleitung aus und behandelt auch deren Fehlschlag.
+ */
+function flz_ags_safe_redirect(string $url): void
+{
+    if (!wp_safe_redirect($url)) {
+        wp_die(esc_html__('Die interne Weiterleitung ist fehlgeschlagen.', 'flz-ags'));
+    }
+    exit;
+}
+
+/**
+ * Verhindert, dass Tabellenkalkulationen Nutzwerte als Formel ausführen.
+ */
+function flz_ags_csv_cell($value): string
+{
+    $value = (string) $value;
+    return preg_match('/^[=+\-@]/', $value) ? "'" . $value : $value;
 }
 
 function flz_ags_manage_capability(): string

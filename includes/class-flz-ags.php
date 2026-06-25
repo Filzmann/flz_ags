@@ -2,6 +2,9 @@
 
 defined('ABSPATH') || exit;
 
+// Exception-Texte sind interne Logdaten; HTML-Escaping erfolgt erst an der UI-Grenze.
+// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped
+
 class FLZ_AGS_Plugin
 {
     private static ?FLZ_AGS_Plugin $instance = null;
@@ -75,6 +78,17 @@ class FLZ_AGS_Plugin
         }
     }
 
+    /**
+     * Protokolliert einen technischen Fehler und leitet mit sicherem Fehlercode
+     * auf eine interne Administrationsseite zurück.
+     */
+    private function redirect_admin_error(Throwable $error, string $context, string $code, array $args): void
+    {
+        flz_ags_log_error($error, $context);
+        $args['flz_ags_error'] = $code;
+        flz_ags_safe_redirect(flz_ags_admin_url($args));
+    }
+
     public function render_admin_courses_page(): void
     {
         $this->assert_admin_permission();
@@ -92,11 +106,22 @@ class FLZ_AGS_Plugin
             $count = absint($_GET['demo']);
             echo wp_kses_post(flz_ags_notice($count . ' Demo-AGs wurden angelegt. Bereits vorhandene Demo-AGs wurden übersprungen.'));
         }
+        if (isset($_GET['flz_ags_error'])) {
+            $error_code = sanitize_key(wp_unslash($_GET['flz_ags_error']));
+            echo wp_kses_post(flz_ags_notice(flz_ags_error_message($error_code), 'error'));
+        }
 
-        if ($action === 'new' || ($action === 'edit' && $course_id > 0)) {
-            $this->render_course_form($course_id);
-        } else {
-            $this->render_course_list();
+        try {
+            if ($action === 'new' || ($action === 'edit' && $course_id > 0)) {
+                $this->render_course_form($course_id);
+            } else {
+                $this->render_course_list();
+            }
+        } catch (Throwable $error) {
+            flz_ags_log_error($error, 'Anzeigen der AG-Verwaltung');
+            echo wp_kses_post(
+                flz_ags_notice('Die AG-Daten konnten nicht geladen werden. Details stehen im Serverprotokoll.', 'error')
+            );
         }
 
         echo '</div>';
@@ -104,54 +129,22 @@ class FLZ_AGS_Plugin
 
     private function get_course(int $course_id): ?object
     {
-        global $wpdb;
-        $table = flz_ags_table('courses');
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated internally.
-        $course = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $course_id));
-        return $course ?: null;
+        return FLZ_AGS_Course::get_by_id($course_id);
     }
 
     private function get_courses(string $school_year, bool $public_only = false): array
     {
-        global $wpdb;
-        $table = flz_ags_table('courses');
-        $sql = "SELECT * FROM {$table} WHERE school_year = %s ORDER BY sort_order ASC, title ASC";
-
-        if ($public_only) {
-            $sql = "SELECT * FROM {$table} WHERE school_year = %s AND is_active = 1 AND is_visible = 1 ORDER BY sort_order ASC, title ASC";
-        }
-
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name is generated internally.
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL contains only internal table names and placeholders.
-        return $wpdb->get_results($wpdb->prepare($sql, $school_year));
+        return FLZ_AGS_Course::find_for_school_year($school_year, $public_only);
     }
 
     private function get_course_slots(int $course_id, bool $include_inactive = true): array
     {
-        global $wpdb;
-        $table = flz_ags_table('slots');
-        $sql = "SELECT * FROM {$table} WHERE course_id = %d ORDER BY sort_order ASC, weekday ASC, start_time ASC";
-
-        if (!$include_inactive) {
-            $sql = "SELECT * FROM {$table} WHERE course_id = %d AND is_active = 1 ORDER BY sort_order ASC, weekday ASC, start_time ASC";
-        }
-
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name is generated internally.
-        return $wpdb->get_results($wpdb->prepare($sql, $course_id));
+        return FLZ_AGS_Slot::find_for_course($course_id, $include_inactive);
     }
 
-    private function get_slot_with_course(int $slot_id): ?object
+    private function get_slot_with_course(int $slot_id, bool $for_update = false): ?object
     {
-        global $wpdb;
-
-        $sql = 'SELECT s.*, c.title, c.allowed_grades, c.only_grade_7, c.registration_open, c.is_active AS course_active, c.is_visible AS course_visible
-                FROM ' . flz_ags_table('slots') . ' s
-                INNER JOIN ' . flz_ags_table('courses') . ' c ON c.id = s.course_id
-                WHERE s.id = %d';
-
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL contains only internal table names and placeholders.
-        $row = $wpdb->get_row($wpdb->prepare($sql, $slot_id));
-        return $row ?: null;
+        return FLZ_AGS_Slot::find_with_course($slot_id, $for_update);
     }
 
     private function render_course_list(): void
@@ -303,7 +296,6 @@ class FLZ_AGS_Plugin
         $this->assert_admin_permission();
         check_admin_referer('flz_ags_save_course');
 
-        global $wpdb;
         $now = current_time('mysql');
         $course_id = isset($_POST['course_id']) ? absint($_POST['course_id']) : 0;
         $title = isset($_POST['title']) ? sanitize_text_field(wp_unslash($_POST['title'])) : '';
@@ -332,69 +324,100 @@ class FLZ_AGS_Plugin
             'updated_at' => $now,
         );
 
-        if ($course_id > 0) {
-            $wpdb->update(flz_ags_table('courses'), $data, array('id' => $course_id));
-        } else {
-            $data['created_at'] = $now;
-            $wpdb->insert(flz_ags_table('courses'), $data);
-            $course_id = (int) $wpdb->insert_id;
-        }
-
         $slots = array();
         if (isset($_POST['slots']) && is_array($_POST['slots'])) {
             $slots = map_deep(wp_unslash($_POST['slots']), 'sanitize_text_field');
         }
-        foreach ($slots as $slot) {
-            if (!is_array($slot)) {
-                continue;
-            }
 
-            $slot_id = isset($slot['id']) ? absint($slot['id']) : 0;
-            $weekday = isset($slot['weekday']) ? absint($slot['weekday']) : 0;
-            $start_time = isset($slot['start_time']) ? sanitize_text_field($slot['start_time']) : '';
-            $end_time = isset($slot['end_time']) ? sanitize_text_field($slot['end_time']) : '';
-            $room = isset($slot['room']) ? sanitize_text_field($slot['room']) : '';
-            $max_participants = isset($slot['max_participants']) ? max(0, intval($slot['max_participants'])) : 0;
-            $is_active = isset($slot['is_active']) ? 1 : 0;
-            $sort_order = isset($slot['sort_order']) ? intval($slot['sort_order']) : 0;
+        try {
+            $course_id = FLZ_AGS_Model::transaction(
+                function () use ($course_id, $data, $slots, $school_year, $now): int {
+                    $course = $course_id > 0 ? FLZ_AGS_Course::get_by_id($course_id) : new FLZ_AGS_Course();
+                    if (!$course instanceof FLZ_AGS_Course) {
+                        throw new UnexpectedValueException('Die zu aktualisierende AG wurde nicht gefunden.');
+                    }
 
-            $has_values = $weekday > 0 || $start_time !== '' || $end_time !== '' || $room !== '';
-            if (!$has_values && $slot_id === 0) {
-                continue;
-            }
+                    foreach ($data as $property => $value) {
+                        $course->{$property} = $value;
+                    }
+                    if ($course->created_at === null) {
+                        $course->created_at = $now;
+                    }
+                    $course->save();
+                    $saved_course_id = (int) $course->id;
 
-            if (!$has_values && $slot_id > 0) {
-                $wpdb->update(flz_ags_table('slots'), array('is_active' => 0, 'updated_at' => $now), array('id' => $slot_id, 'course_id' => $course_id));
-                continue;
-            }
+                    foreach ($slots as $index => $slot_data) {
+                        if (!is_array($slot_data)) {
+                            throw new UnexpectedValueException('AG-Termin ' . ($index + 1) . ' hat ein ungültiges Datenformat.');
+                        }
 
-            if ($weekday < 1 || $weekday > 7 || !preg_match('/^\d{2}:\d{2}$/', $start_time) || !preg_match('/^\d{2}:\d{2}$/', $end_time)) {
-                continue;
-            }
+                        $slot_id = isset($slot_data['id']) ? absint($slot_data['id']) : 0;
+                        $weekday = isset($slot_data['weekday']) ? absint($slot_data['weekday']) : 0;
+                        $start_time = isset($slot_data['start_time']) ? sanitize_text_field($slot_data['start_time']) : '';
+                        $end_time = isset($slot_data['end_time']) ? sanitize_text_field($slot_data['end_time']) : '';
+                        $room = isset($slot_data['room']) ? sanitize_text_field($slot_data['room']) : '';
+                        $has_values = $weekday > 0 || $start_time !== '' || $end_time !== '' || $room !== '';
 
-            $slot_data = array(
-                'course_id' => $course_id,
-                'school_year' => $school_year,
-                'weekday' => $weekday,
-                'start_time' => $start_time . ':00',
-                'end_time' => $end_time . ':00',
-                'room' => $room,
-                'max_participants' => $max_participants,
-                'is_active' => $is_active,
-                'sort_order' => $sort_order,
-                'updated_at' => $now,
+                        if (!$has_values && $slot_id === 0) {
+                            continue;
+                        }
+
+                        $slot = $slot_id > 0
+                            ? FLZ_AGS_Slot::get_by_fields(array('id' => $slot_id, 'course_id' => $saved_course_id))
+                            : new FLZ_AGS_Slot();
+                        if (!$slot instanceof FLZ_AGS_Slot) {
+                            throw new UnexpectedValueException('AG-Termin ' . ($index + 1) . ' gehört nicht zur bearbeiteten AG.');
+                        }
+
+                        if (!$has_values) {
+                            $slot->is_active = 0;
+                            $slot->updated_at = $now;
+                            $slot->save();
+                            continue;
+                        }
+
+                        if (
+                            $weekday < 1 || $weekday > 7
+                            || !preg_match('/^\d{2}:\d{2}$/', $start_time)
+                            || !preg_match('/^\d{2}:\d{2}$/', $end_time)
+                        ) {
+                            throw new UnexpectedValueException('AG-Termin ' . ($index + 1) . ' enthält ungültige Zeitangaben.');
+                        }
+
+                        $slot->course_id = $saved_course_id;
+                        $slot->school_year = $school_year;
+                        $slot->weekday = $weekday;
+                        $slot->start_time = $start_time . ':00';
+                        $slot->end_time = $end_time . ':00';
+                        $slot->room = $room;
+                        $slot->max_participants = isset($slot_data['max_participants'])
+                            ? max(0, intval($slot_data['max_participants']))
+                            : 0;
+                        $slot->is_active = isset($slot_data['is_active']) ? 1 : 0;
+                        $slot->sort_order = isset($slot_data['sort_order']) ? intval($slot_data['sort_order']) : 0;
+                        $slot->updated_at = $now;
+                        if ($slot->created_at === null) {
+                            $slot->created_at = $now;
+                        }
+                        $slot->save();
+                    }
+
+                    return $saved_course_id;
+                },
+                'Speichern einer AG mit ihren Terminen'
             );
-
-            if ($slot_id > 0) {
-                $wpdb->update(flz_ags_table('slots'), $slot_data, array('id' => $slot_id, 'course_id' => $course_id));
-            } else {
-                $slot_data['created_at'] = $now;
-                $wpdb->insert(flz_ags_table('slots'), $slot_data);
-            }
+        } catch (Throwable $error) {
+            $this->redirect_admin_error(
+                $error,
+                'Speichern einer AG',
+                'save-course',
+                array('page' => 'flz-ags', 'action' => $course_id > 0 ? 'edit' : 'new', 'course_id' => $course_id)
+            );
         }
 
-        wp_safe_redirect(flz_ags_admin_url(array('page' => 'flz-ags', 'action' => 'edit', 'course_id' => $course_id, 'saved' => 1)));
-        exit;
+        flz_ags_safe_redirect(
+            flz_ags_admin_url(array('page' => 'flz-ags', 'action' => 'edit', 'course_id' => $course_id, 'saved' => 1))
+        );
     }
 
     public function render_admin_settings_page(): void
@@ -437,8 +460,7 @@ class FLZ_AGS_Plugin
         update_option('flz_ags_current_school_year', $school_year, false);
         update_option('flz_ags_classes', !empty($classes) ? $classes : flz_ags_default_classes(), false);
 
-        wp_safe_redirect(flz_ags_admin_url(array('page' => 'flz-ags-settings', 'saved' => 1)));
-        exit;
+        flz_ags_safe_redirect(flz_ags_admin_url(array('page' => 'flz-ags-settings', 'saved' => 1)));
     }
 
     public function render_admin_demo_page(): void
@@ -449,6 +471,10 @@ class FLZ_AGS_Plugin
 
         echo '<div class="wrap flz-ags-admin">';
         echo '<h1>FLZ AGs – Demo-Setup</h1>';
+        if (isset($_GET['flz_ags_error'])) {
+            $error_code = sanitize_key(wp_unslash($_GET['flz_ags_error']));
+            echo wp_kses_post(flz_ags_notice(flz_ags_error_message($error_code), 'error'));
+        }
         echo '<p>Legt eine Auswahl vorhandener AGs als Demo-Datensatz für das gewählte Schuljahr an. Vorhandene AGs mit gleichem Slug und Schuljahr werden nicht dupliziert.</p>';
         echo '<form method="get" class="flz-ags-admin-filter">';
         echo '<input type="hidden" name="page" value="flz-ags-demo">';
@@ -481,110 +507,85 @@ class FLZ_AGS_Plugin
         $this->assert_admin_permission();
         check_admin_referer('flz_ags_install_demo');
 
-        global $wpdb;
-        // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are generated internally; user input remains sanitized before use.
         $school_year = isset($_POST['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_POST['school_year']))) : flz_ags_current_school_year();
         $now = current_time('mysql');
-        $inserted = 0;
+        try {
+            $inserted = FLZ_AGS_Model::transaction(
+                static function () use ($school_year, $now): int {
+                    $inserted_count = 0;
+                    foreach (flz_ags_demo_courses() as $course_data) {
+                        $slug = sanitize_title($course_data['title']);
+                        $exists = FLZ_AGS_Course::count_by(array('school_year' => $school_year, 'slug' => $slug));
+                        if ($exists > 0) {
+                            continue;
+                        }
 
-        foreach (flz_ags_demo_courses() as $course) {
-            $slug = sanitize_title($course['title']);
-            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name is generated internally.
-            $exists = (int) $wpdb->get_var($wpdb->prepare(
-                'SELECT COUNT(*) FROM ' . flz_ags_table('courses') . ' WHERE school_year = %s AND slug = %s',
-                $school_year,
-                $slug
-            ));
-            if ($exists > 0) {
-                continue;
-            }
+                        $course = new FLZ_AGS_Course(array(
+                            'school_year' => $school_year,
+                            'title' => sanitize_text_field($course_data['title']),
+                            'slug' => $slug,
+                            'short_description' => sanitize_textarea_field($course_data['short_description']),
+                            'description' => wp_kses_post($course_data['description']),
+                            'image_url' => esc_url_raw($course_data['image_url']),
+                            'info_url' => esc_url_raw($course_data['info_url']),
+                            'category' => sanitize_text_field($course_data['category']),
+                            'leader_name' => sanitize_text_field($course_data['leader_name']),
+                            'allowed_grades' => flz_ags_sanitize_allowed_grades($course_data['allowed_grades']),
+                            'only_grade_7' => !empty($course_data['only_grade_7']) ? 1 : 0,
+                            'is_active' => 1,
+                            'is_visible' => 1,
+                            'registration_open' => 1,
+                            'sort_order' => intval($course_data['sort_order']),
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ));
+                        $course->save();
 
-            $wpdb->insert(flz_ags_table('courses'), array(
-                'school_year' => $school_year,
-                'title' => sanitize_text_field($course['title']),
-                'slug' => $slug,
-                'short_description' => sanitize_textarea_field($course['short_description']),
-                'description' => wp_kses_post($course['description']),
-                'image_url' => esc_url_raw($course['image_url']),
-                'info_url' => esc_url_raw($course['info_url']),
-                'category' => sanitize_text_field($course['category']),
-                'leader_name' => sanitize_text_field($course['leader_name']),
-                'allowed_grades' => flz_ags_sanitize_allowed_grades($course['allowed_grades']),
-                'only_grade_7' => !empty($course['only_grade_7']) ? 1 : 0,
-                'is_active' => 1,
-                'is_visible' => 1,
-                'registration_open' => 1,
-                'sort_order' => intval($course['sort_order']),
-                'created_at' => $now,
-                'updated_at' => $now,
-            ));
+                        foreach ($course_data['slots'] as $index => $slot_data) {
+                            $slot = new FLZ_AGS_Slot(array(
+                                'course_id' => (int) $course->id,
+                                'school_year' => $school_year,
+                                'weekday' => absint($slot_data['weekday']),
+                                'start_time' => sanitize_text_field($slot_data['start_time']) . ':00',
+                                'end_time' => sanitize_text_field($slot_data['end_time']) . ':00',
+                                'room' => sanitize_text_field($slot_data['room']),
+                                'max_participants' => max(0, intval($slot_data['max_participants'])),
+                                'is_active' => 1,
+                                'sort_order' => $index,
+                                'created_at' => $now,
+                                'updated_at' => $now,
+                            ));
+                            $slot->save();
+                        }
+                        $inserted_count++;
+                    }
 
-            $course_id = (int) $wpdb->insert_id;
-            if ($course_id <= 0) {
-                continue;
-            }
-
-            foreach ($course['slots'] as $index => $slot) {
-                $wpdb->insert(flz_ags_table('slots'), array(
-                    'course_id' => $course_id,
-                    'school_year' => $school_year,
-                    'weekday' => absint($slot['weekday']),
-                    'start_time' => sanitize_text_field($slot['start_time']) . ':00',
-                    'end_time' => sanitize_text_field($slot['end_time']) . ':00',
-                    'room' => sanitize_text_field($slot['room']),
-                    'max_participants' => max(0, intval($slot['max_participants'])),
-                    'is_active' => 1,
-                    'sort_order' => $index,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ));
-            }
-            $inserted++;
+                    return $inserted_count;
+                },
+                'Anlegen der Demo-AGs'
+            );
+        } catch (Throwable $error) {
+            $this->redirect_admin_error(
+                $error,
+                'Anlegen der Demo-AGs',
+                'install-demo',
+                array('page' => 'flz-ags-demo', 'school_year' => $school_year)
+            );
         }
 
-        // phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-
-        wp_safe_redirect(flz_ags_admin_url(array('page' => 'flz-ags', 'school_year' => $school_year, 'demo' => $inserted)));
-        exit;
+        flz_ags_safe_redirect(
+            flz_ags_admin_url(array('page' => 'flz-ags', 'school_year' => $school_year, 'demo' => $inserted))
+        );
     }
 
     private function count_active_registrations(int $slot_id): int
     {
-        global $wpdb;
-        $table = flz_ags_table('registrations');
-
-        // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated internally; values are passed as placeholders.
-        $count = (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$table} WHERE slot_id = %d AND status = %s",
-            $slot_id,
-            'active'
-        ));
-        // phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-
-        return $count;
+        return FLZ_AGS_Registration::count_by(array('slot_id' => $slot_id, 'status' => 'active'));
     }
 
     private function get_public_slots(string $school_year): array
     {
-        global $wpdb;
-
-        $slots_table = flz_ags_table('slots');
-        $courses_table = flz_ags_table('courses');
-
-        // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are generated internally; school year is passed as placeholder.
-        $sql = "SELECT s.*, c.title, c.short_description, c.description, c.image_url, c.info_url, c.category, c.leader_name, c.allowed_grades, c.only_grade_7, c.registration_open
-                FROM {$slots_table} s
-                INNER JOIN {$courses_table} c ON c.id = s.course_id
-                WHERE s.school_year = %s
-                  AND s.is_active = 1
-                  AND c.is_active = 1
-                  AND c.is_visible = 1
-                ORDER BY c.sort_order ASC, c.title ASC, s.weekday ASC, s.start_time ASC";
-
-        $results = $wpdb->get_results($wpdb->prepare($sql, $school_year));
-        // phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-
-        return $results;
+        return FLZ_AGS_Slot::find_public_for_school_year($school_year);
     }
 
     private function get_public_courses_with_slots(string $school_year): array
@@ -609,7 +610,14 @@ class FLZ_AGS_Plugin
 
         $school_year = flz_ags_sanitize_school_year($atts['school_year']);
         $registration_url = esc_url_raw((string) $atts['registration_url']);
-        $courses = $this->get_public_courses_with_slots($school_year);
+        try {
+            $courses = $this->get_public_courses_with_slots($school_year);
+        } catch (Throwable $error) {
+            flz_ags_log_error($error, 'Anzeigen der öffentlichen AG-Liste');
+            return '<div class="flz-ags"><p class="flz-ags-message flz-ags-message-error">'
+                . esc_html__('Die AG-Liste kann derzeit nicht geladen werden. Bitte später erneut versuchen.', 'flz-ags')
+                . '</p></div>';
+        }
 
         wp_enqueue_style('flz-ags');
         wp_enqueue_script('flz-ags');
@@ -780,19 +788,27 @@ class FLZ_AGS_Plugin
         wp_enqueue_script('flz-ags');
 
         ob_start();
-        echo '<div class="flz-ags flz-ags-registration">';
-        echo '<h2>AG-Anmeldung ' . esc_html($school_year) . '</h2>';
+        try {
+            echo '<div class="flz-ags flz-ags-registration">';
+            echo '<h2>AG-Anmeldung ' . esc_html($school_year) . '</h2>';
 
-        foreach ($messages as $message) {
-            echo '<p class="flz-ags-message ' . ($success ? 'flz-ags-message-success' : 'flz-ags-message-error') . '">' . esc_html($message) . '</p>';
+            foreach ($messages as $message) {
+                echo '<p class="flz-ags-message ' . ($success ? 'flz-ags-message-success' : 'flz-ags-message-error') . '">' . esc_html($message) . '</p>';
+            }
+
+            if (!$success) {
+                $this->render_registration_form($school_year);
+            }
+
+            echo '</div>';
+            return (string) ob_get_clean();
+        } catch (Throwable $error) {
+            ob_end_clean();
+            flz_ags_log_error($error, 'Anzeigen der AG-Anmeldung');
+            return '<div class="flz-ags"><p class="flz-ags-message flz-ags-message-error">'
+                . esc_html__('Die AG-Anmeldung kann derzeit nicht geladen werden. Bitte später erneut versuchen.', 'flz-ags')
+                . '</p></div>';
         }
-
-        if (!$success) {
-            $this->render_registration_form($school_year);
-        }
-
-        echo '</div>';
-        return (string) ob_get_clean();
     }
 
     private function render_registration_form(string $school_year): void
@@ -866,8 +882,6 @@ class FLZ_AGS_Plugin
 
     private function handle_frontend_registration(string $school_year): array
     {
-        global $wpdb;
-
         $messages = array();
         if (!isset($_POST['flz_ags_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['flz_ags_nonce'])), 'flz_ags_frontend_registration')) {
             return array('success' => false, 'messages' => array('Die Anmeldung konnte aus Sicherheitsgründen nicht verarbeitet werden. Bitte Formular neu laden.'));
@@ -900,64 +914,81 @@ class FLZ_AGS_Plugin
             return array('success' => false, 'messages' => $messages);
         }
 
-        $slot = $this->get_slot_with_course($slot_id);
-        if (!$slot || $slot->school_year !== $school_year || empty($slot->is_active) || empty($slot->course_active) || empty($slot->course_visible) || empty($slot->registration_open)) {
-            return array('success' => false, 'messages' => array('Der gewählte AG-Slot ist nicht verfügbar.'));
+        try {
+            return FLZ_AGS_Model::transaction(
+                function () use ($school_year, $class_name, $first_name, $last_name, $guardian_email, $slot_id, $consent): array {
+                    // Die Sperre serialisiert Kapazitätsprüfungen und Insert für diesen Termin.
+                    $slot = $this->get_slot_with_course($slot_id, true);
+                    if (
+                        !$slot
+                        || $slot->school_year !== $school_year
+                        || empty($slot->is_active)
+                        || empty($slot->course_active)
+                        || empty($slot->course_visible)
+                        || empty($slot->registration_open)
+                    ) {
+                        return array('success' => false, 'messages' => array('Der gewählte AG-Slot ist nicht verfügbar.'));
+                    }
+
+                    if (!flz_ags_grade_is_allowed($class_name, (string) $slot->allowed_grades, !empty($slot->only_grade_7))) {
+                        return array('success' => false, 'messages' => array('Dieser AG-Slot ist für die gewählte Klasse nicht freigegeben.'));
+                    }
+
+                    $taken = $this->count_active_registrations((int) $slot->id);
+                    if ((int) $slot->max_participants > 0 && $taken >= (int) $slot->max_participants) {
+                        return array('success' => false, 'messages' => array('Dieser AG-Slot ist inzwischen ausgebucht.'));
+                    }
+
+                    $duplicate = FLZ_AGS_Registration::count_by(array(
+                        'school_year' => $school_year,
+                        'class_name' => $class_name,
+                        'student_first_name' => $first_name,
+                        'student_last_name' => $last_name,
+                        'status' => 'active',
+                    ));
+                    if ($duplicate > 0) {
+                        return array(
+                            'success' => false,
+                            'messages' => array('Für diese Schüler*in existiert in diesem Schuljahr bereits eine aktive AG-Anmeldung. Änderungen bitte über die Schule veranlassen.'),
+                        );
+                    }
+
+                    $now = current_time('mysql');
+                    $registration = new FLZ_AGS_Registration(array(
+                        'course_id' => (int) $slot->course_id,
+                        'slot_id' => (int) $slot->id,
+                        'school_year' => $school_year,
+                        'class_name' => $class_name,
+                        'grade_key' => flz_ags_extract_grade_key($class_name),
+                        'student_first_name' => $first_name,
+                        'student_last_name' => $last_name,
+                        'guardian_email' => $guardian_email,
+                        'status' => 'active',
+                        'consent_privacy' => $consent,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ));
+                    $registration->save();
+
+                    return array(
+                        'success' => true,
+                        'messages' => array('Die AG-Anmeldung wurde gespeichert. Die Teilnahme gilt bis auf Widerruf.'),
+                    );
+                },
+                'Prüfen und Speichern einer AG-Anmeldung'
+            );
+        } catch (Throwable $error) {
+            flz_ags_log_error($error, 'Speichern einer öffentlichen AG-Anmeldung');
+            return array(
+                'success' => false,
+                'messages' => array('Die Anmeldung konnte wegen eines technischen Fehlers nicht gespeichert werden. Bitte später erneut versuchen.'),
+            );
         }
-
-        if (!flz_ags_grade_is_allowed($class_name, (string) $slot->allowed_grades, !empty($slot->only_grade_7))) {
-            return array('success' => false, 'messages' => array('Dieser AG-Slot ist für die gewählte Klasse nicht freigegeben.'));
-        }
-
-        $taken = $this->count_active_registrations((int) $slot->id);
-        if ((int) $slot->max_participants > 0 && $taken >= (int) $slot->max_participants) {
-            return array('success' => false, 'messages' => array('Dieser AG-Slot ist inzwischen ausgebucht.'));
-        }
-
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name is generated internally.
-        // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are generated internally; submitted values are sanitized before DB use.
-        $duplicate = (int) $wpdb->get_var($wpdb->prepare(
-            'SELECT COUNT(*) FROM ' . flz_ags_table('registrations') . ' WHERE school_year = %s AND class_name = %s AND student_first_name = %s AND student_last_name = %s AND status = %s',
-            $school_year,
-            $class_name,
-            $first_name,
-            $last_name,
-            'active'
-        ));
-
-        if ($duplicate > 0) {
-            return array('success' => false, 'messages' => array('Für diese Schüler*in existiert in diesem Schuljahr bereits eine aktive AG-Anmeldung. Änderungen bitte über die Schule veranlassen.'));
-        }
-
-        $now = current_time('mysql');
-        $wpdb->insert(flz_ags_table('registrations'), array(
-            'course_id' => (int) $slot->course_id,
-            'slot_id' => (int) $slot->id,
-            'school_year' => $school_year,
-            'class_name' => $class_name,
-            'grade_key' => flz_ags_extract_grade_key($class_name),
-            'student_first_name' => $first_name,
-            'student_last_name' => $last_name,
-            'guardian_email' => $guardian_email,
-            'status' => 'active',
-            'consent_privacy' => $consent,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ));
-
-        if ($wpdb->insert_id <= 0) {
-            return array('success' => false, 'messages' => array('Die Anmeldung konnte nicht gespeichert werden.'));
-        }
-
-        // phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-
-        return array('success' => true, 'messages' => array('Die AG-Anmeldung wurde gespeichert. Die Teilnahme gilt bis auf Widerruf.'));
     }
 
     public function render_admin_registrations_page(): void
     {
         $this->assert_admin_permission();
-        global $wpdb;
 
         $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_GET['school_year']))) : flz_ags_current_school_year();
         $status = isset($_GET['status']) ? sanitize_key(wp_unslash($_GET['status'])) : 'active';
@@ -965,20 +996,28 @@ class FLZ_AGS_Plugin
             $status = 'active';
         }
 
-        $sql = 'SELECT r.*, c.title, s.weekday, s.start_time, s.end_time, s.room
-                FROM ' . flz_ags_table('registrations') . ' r
-                INNER JOIN ' . flz_ags_table('courses') . ' c ON c.id = r.course_id
-                INNER JOIN ' . flz_ags_table('slots') . ' s ON s.id = r.slot_id
-                WHERE r.school_year = %s AND r.status = %s
-                ORDER BY r.class_name ASC, r.student_last_name ASC, r.student_first_name ASC';
-
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL contains only internal table names and placeholders.
-        $registrations = $wpdb->get_results($wpdb->prepare($sql, $school_year, $status));
+        $registrations = array();
+        $load_failed = false;
+        try {
+            $registrations = FLZ_AGS_Registration::find_for_admin($school_year, $status);
+        } catch (Throwable $error) {
+            $load_failed = true;
+            flz_ags_log_error($error, 'Laden der AG-Anmeldungen im Backend');
+        }
 
         echo '<div class="wrap flz-ags-admin">';
         echo '<h1>AG-Anmeldungen</h1>';
         if (isset($_GET['updated'])) {
             echo wp_kses_post(flz_ags_notice('Anmeldung aktualisiert.'));
+        }
+        if (isset($_GET['flz_ags_error'])) {
+            $error_code = sanitize_key(wp_unslash($_GET['flz_ags_error']));
+            echo wp_kses_post(flz_ags_notice(flz_ags_error_message($error_code), 'error'));
+        }
+        if ($load_failed) {
+            echo wp_kses_post(
+                flz_ags_notice('Die Anmeldungen konnten nicht geladen werden. Details stehen im Serverprotokoll.', 'error')
+            );
         }
 
         echo '<form method="get" class="flz-ags-admin-filter">';
@@ -1029,7 +1068,6 @@ class FLZ_AGS_Plugin
         $this->assert_admin_permission();
         check_admin_referer('flz_ags_update_registration');
 
-        global $wpdb;
         $registration_id = isset($_POST['registration_id']) ? absint($_POST['registration_id']) : 0;
         $new_status = isset($_POST['new_status']) ? sanitize_key(wp_unslash($_POST['new_status'])) : '';
 
@@ -1037,18 +1075,27 @@ class FLZ_AGS_Plugin
             wp_die('Ungültige Anfrage.');
         }
 
-        $data = array(
-            'status' => $new_status,
-            'updated_at' => current_time('mysql'),
-        );
-        if ($new_status === 'withdrawn') {
-            $data['withdrawn_at'] = current_time('mysql');
+        try {
+            $registration = FLZ_AGS_Registration::get_by_id($registration_id);
+            if (!$registration instanceof FLZ_AGS_Registration) {
+                throw new UnexpectedValueException('Die zu aktualisierende AG-Anmeldung wurde nicht gefunden.');
+            }
+            $registration->status = $new_status;
+            $registration->updated_at = current_time('mysql');
+            if ($new_status === 'withdrawn') {
+                $registration->withdrawn_at = current_time('mysql');
+            }
+            $registration->save();
+        } catch (Throwable $error) {
+            $this->redirect_admin_error(
+                $error,
+                'Aktualisieren einer AG-Anmeldung',
+                'update-registration',
+                array('page' => 'flz-ags-registrations')
+            );
         }
 
-        $wpdb->update(flz_ags_table('registrations'), $data, array('id' => $registration_id));
-
-        wp_safe_redirect(flz_ags_admin_url(array('page' => 'flz-ags-registrations', 'updated' => 1)));
-        exit;
+        flz_ags_safe_redirect(flz_ags_admin_url(array('page' => 'flz-ags-registrations', 'updated' => 1)));
     }
 
     public function handle_export_csv(): void
@@ -1056,49 +1103,90 @@ class FLZ_AGS_Plugin
         $this->assert_admin_permission();
         check_admin_referer('flz_ags_export_csv');
 
-        global $wpdb;
         $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_GET['school_year']))) : flz_ags_current_school_year();
         $status = isset($_GET['status']) ? sanitize_key(wp_unslash($_GET['status'])) : 'active';
         if (!array_key_exists($status, flz_ags_status_labels())) {
             $status = 'active';
         }
 
-        $sql = 'SELECT r.*, c.title, s.weekday, s.start_time, s.end_time, s.room
-                FROM ' . flz_ags_table('registrations') . ' r
-                INNER JOIN ' . flz_ags_table('courses') . ' c ON c.id = r.course_id
-                INNER JOIN ' . flz_ags_table('slots') . ' s ON s.id = r.slot_id
-                WHERE r.school_year = %s AND r.status = %s
-                ORDER BY c.title ASC, s.weekday ASC, r.class_name ASC, r.student_last_name ASC';
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL contains only internal table names and placeholders.
-        $rows = $wpdb->get_results($wpdb->prepare($sql, $school_year, $status), ARRAY_A);
+        try {
+            $rows = FLZ_AGS_Registration::find_for_admin($school_year, $status, true);
+            $out = fopen('php://temp', 'w+b');
+            if ($out === false) {
+                throw flz_wpdb_objects\FlzWpdbObjectsException::file_system(
+                    'Öffnen des temporären CSV-Speichers',
+                    'php://temp'
+                );
+            }
+
+            if (fwrite($out, chr(0xEF) . chr(0xBB) . chr(0xBF)) !== 3) {
+                throw flz_wpdb_objects\FlzWpdbObjectsException::file_system(
+                    'Schreiben der CSV-Kodierungsmarkierung',
+                    'php://temp'
+                );
+            }
+            if (fputcsv($out, array('Schuljahr', 'Status', 'Klasse', 'Jahrgang', 'Nachname', 'Vorname', 'E-Mail', 'AG', 'Wochentag', 'Beginn', 'Ende', 'Raum', 'Anmeldedatum'), ';') === false) {
+                throw flz_wpdb_objects\FlzWpdbObjectsException::file_system(
+                    'Schreiben der CSV-Kopfzeile',
+                    'php://temp'
+                );
+            }
+
+            foreach ($rows as $row) {
+                $csv_row = array(
+                    $row->school_year,
+                    flz_ags_status_label($row->status),
+                    $row->class_name,
+                    $row->grade_key,
+                    $row->student_last_name,
+                    $row->student_first_name,
+                    $row->guardian_email,
+                    $row->title,
+                    flz_ags_weekday_label($row->weekday),
+                    flz_ags_format_time($row->start_time),
+                    flz_ags_format_time($row->end_time),
+                    $row->room,
+                    $row->created_at,
+                );
+                if (fputcsv($out, array_map('flz_ags_csv_cell', $csv_row), ';') === false) {
+                    throw flz_wpdb_objects\FlzWpdbObjectsException::file_system(
+                        'Schreiben einer CSV-Datenzeile',
+                        'php://temp'
+                    );
+                }
+            }
+
+            if (!rewind($out)) {
+                throw flz_wpdb_objects\FlzWpdbObjectsException::file_system(
+                    'Zurücksetzen des CSV-Datenstroms',
+                    'php://temp'
+                );
+            }
+            $csv = stream_get_contents($out);
+            fclose($out);
+            if ($csv === false) {
+                throw flz_wpdb_objects\FlzWpdbObjectsException::file_system(
+                    'Lesen des fertigen CSV-Datenstroms',
+                    'php://temp'
+                );
+            }
+        } catch (Throwable $error) {
+            if (isset($out) && is_resource($out)) {
+                fclose($out);
+            }
+            $this->redirect_admin_error(
+                $error,
+                'Erstellen des AG-CSV-Exports',
+                'export',
+                array('page' => 'flz-ags-registrations', 'school_year' => $school_year, 'status' => $status)
+            );
+        }
 
         nocache_headers();
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="flz-ag-anmeldungen-' . sanitize_file_name($school_year) . '-' . sanitize_file_name($status) . '.csv"');
-
-        $out = fopen('php://output', 'w');
-        fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
-        fputcsv($out, array('Schuljahr', 'Status', 'Klasse', 'Jahrgang', 'Nachname', 'Vorname', 'E-Mail', 'AG', 'Wochentag', 'Beginn', 'Ende', 'Raum', 'Anmeldedatum'), ';');
-
-        foreach ($rows as $row) {
-            fputcsv($out, array(
-                $row['school_year'],
-                flz_ags_status_label($row['status']),
-                $row['class_name'],
-                $row['grade_key'],
-                $row['student_last_name'],
-                $row['student_first_name'],
-                $row['guardian_email'],
-                $row['title'],
-                flz_ags_weekday_label($row['weekday']),
-                flz_ags_format_time($row['start_time']),
-                flz_ags_format_time($row['end_time']),
-                $row['room'],
-                $row['created_at'],
-            ), ';');
-        }
-
-        fclose($out);
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Kontrolliert erzeugte CSV-Datei, kein HTML-Kontext.
+        echo $csv;
         exit;
     }
 }

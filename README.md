@@ -1,6 +1,33 @@
-# Tagore AG-Verwaltung 0.2.0
+# Tagore AG-Verwaltung 0.3.0
 
 Initiale WordPress-Plugin-Version für AG-Verwaltung und AG-Anmeldung.
+
+## Neu in 0.3.0
+
+- Vollständige Datenzugriffsmigration auf Modelle aus `flz_wpdb_objects`.
+- Tabellen werden wie im Shared-Plugin üblich aus den Modellnamen abgeleitet:
+  `{prefix}flz_ags_courses`, `{prefix}flz_ags_slots` und
+  `{prefix}flz_ags_registrations`.
+- Schreibvorgänge für AG plus Termine, Demo-Daten und öffentliche Anmeldungen
+  laufen in Datenbanktransaktionen. Fehler hinterlassen keine fachlichen
+  Teilstände.
+- Technische Ursachen werden mit ihrer Exception-Kette protokolliert;
+  Frontend und Backend zeigen getrennte, sichere Fehlermeldungen.
+- CSV-Exporte werden vor dem Senden vollständig geprüft. Führende
+  Tabellenkalkulations-Formeln in Nutzwerten werden neutralisiert.
+
+### Einmaliger Migrationshinweis
+
+Die Version ist noch nicht produktiv. Deshalb findet bewusst **keine
+Datenmigration** aus den bisherigen Tabellen `{prefix}flz_ag_courses`,
+`{prefix}flz_ag_slots` und `{prefix}flz_ag_registrations` statt. Beim
+Schemaaufbau werden die neuen, modellabgeleiteten Tabellen angelegt und die
+drei alten Tabellen anschließend entfernt. Vorhandene Testdaten gehen dabei
+verloren und Demo-/Testdaten müssen neu angelegt werden.
+
+Die Shortcodes, Optionen und Administrations-URLs bleiben unverändert. Das
+Plugin setzt `flz_wpdb_objects` voraus; WordPress erhält diese Abhängigkeit
+zusätzlich über den Plugin-Header `Requires Plugins`.
 
 ## Fachmodell
 
