@@ -2,18 +2,18 @@
 /**
  * Plugin Name: Tagore AG-Verwaltung
  * Description: Verwaltung und Anmeldung für Arbeitsgemeinschaften mit Schuljahr, Vorschaubildern, wöchentlichen Slots, Klassenlogik, Demo-Setup und CSV-Export.
- * Version: 0.3.0
+ * Version: 0.3.1
  * Author: Tagore-Gymnasium / Simon
  * Text Domain: flz-ags
- * Requires Plugins: flz_wpdb_objects
+ * Requires Plugins: flz_wpdb_objects, flz_ui_components
  */
 
 defined('ABSPATH') || exit;
 
-define('FLZ_AGS_VERSION', '0.3.0');
+define('FLZ_AGS_VERSION', '0.3.1');
 define('FLZ_AGS_FILE', __FILE__);
 define('FLZ_AGS_DIR', plugin_dir_path(__FILE__));
-define('FLZ_AGS_URL', plugin_dir_url(__FILE__));
+define('FLZ_AGS_URL', plugins_url('flz_ags/'));
 
 require_once FLZ_AGS_DIR . 'includes/helpers.php';
 
@@ -27,6 +27,23 @@ if (!class_exists('flz_wpdb_objects\\FlzWpdbObject')) {
         echo wp_kses_post(
             flz_ags_notice(
                 'FLZ AGs benötigt das aktive Plugin flz_wpdb_objects. Die AG-Verwaltung wurde nicht gestartet.',
+                'error'
+            )
+        );
+    });
+    return;
+}
+
+$flz_ags_ui_components_file = WP_PLUGIN_DIR . '/flz_ui_components/flz_ui_components.php';
+if (!function_exists('flz_ui') && is_readable($flz_ags_ui_components_file)) {
+    require_once $flz_ags_ui_components_file;
+}
+
+if (!function_exists('flz_ui')) {
+    add_action('admin_notices', static function (): void {
+        echo wp_kses_post(
+            flz_ags_notice(
+                'FLZ AGs benötigt das aktive Plugin flz_ui_components. Die AG-Verwaltung wurde nicht gestartet.',
                 'error'
             )
         );

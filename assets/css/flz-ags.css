@@ -17,7 +17,9 @@
 
 .flz-ags input[type="text"],
 .flz-ags input[type="email"],
-.flz-ags select {
+.flz-ags select,
+.flz-ags .flz-ui-input,
+.flz-ags .flz-ui-select {
   width: 100%;
   max-width: 100%;
   margin-top: 0.25rem;
@@ -30,73 +32,8 @@
   align-items: stretch;
 }
 
-.flz-ags-card,
-.flz-ags-slot-choice {
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  border-radius: 0.75rem;
-  background: #fff;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
 .flz-ags-card {
-  display: flex;
-  flex-direction: column;
   min-height: 100%;
-}
-
-.flz-ags-card-image-wrap {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  background: #f4f4f4;
-}
-
-.flz-ags-card-image {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.flz-ags-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem;
-  flex: 1 1 auto;
-}
-
-.flz-ags-card h3 {
-  margin: 0;
-  line-height: 1.2;
-}
-
-.flz-ags-card-text {
-  margin: 0;
-}
-
-.flz-ags-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: auto;
-}
-
-.flz-ags-meta {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 0.25rem 0.75rem;
-  margin: 0;
-}
-
-.flz-ags-meta dt {
-  font-weight: 700;
-}
-
-.flz-ags-meta dd {
-  margin: 0;
 }
 
 .flz-ags-badge,
@@ -123,25 +60,12 @@
 }
 
 .flz-ags-slot-choice {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
   margin: 0.75rem 0;
-  padding: 0.75rem;
   font-weight: 400;
-  cursor: pointer;
 }
 
-.flz-ags-slot-choice input {
-  margin-top: 0.25rem;
-}
-
-.flz-ags-slot-image {
-  width: 72px;
-  height: 48px;
-  object-fit: cover;
-  border-radius: 0.35rem;
-  flex: 0 0 auto;
+.flz-ags .flz-ui-choice-card {
+  font-weight: 400;
 }
 
 .flz-ags-consent {
@@ -163,8 +87,22 @@
 .flz-ags-slots-table input[type="text"],
 .flz-ags-slots-table input[type="time"],
 .flz-ags-slots-table input[type="number"],
-.flz-ags-slots-table select {
+.flz-ags-slots-table select,
+.flz-ags-slots-table .flz-ui-input,
+.flz-ags-slots-table .flz-ui-select {
   width: 100%;
+}
+
+.flz-ags-slots-table .flz-ui-field,
+.flz-ags-admin-filter .flz-ui-field {
+  margin: 0;
+}
+
+.flz-ags-admin-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
 }
 
 .flz-ags-admin-thumb {

@@ -63,9 +63,15 @@ function flz_ags_safe_redirect(string $url): void
 
 /**
  * Verhindert, dass Tabellenkalkulationen Nutzwerte als Formel ausführen.
+ *
+ * @deprecated Seit 0.3.2 zentral über flz_wpdb_objects_csv_safe_cell().
  */
 function flz_ags_csv_cell($value): string
 {
+    if (function_exists('flz_wpdb_objects_csv_safe_cell')) {
+        return flz_wpdb_objects_csv_safe_cell($value);
+    }
+
     $value = (string) $value;
     return preg_match('/^[=+\-@]/', $value) ? "'" . $value : $value;
 }
@@ -238,6 +244,10 @@ function flz_ags_status_label(string $status): string
 
 function flz_ags_format_time(?string $time): string
 {
+    if (function_exists('flz_ui_format_time')) {
+        return flz_ui_format_time($time);
+    }
+
     $time = (string) $time;
     if ($time === '') {
         return '';
@@ -253,6 +263,10 @@ function flz_ags_admin_url(array $args = array()): string
 
 function flz_ags_notice(string $message, string $type = 'success'): string
 {
+    if (function_exists('flz_ui')) {
+        return flz_ui()->notice($message, $type);
+    }
+
     $class = $type === 'error' ? 'notice notice-error' : 'notice notice-success';
     return '<div class="' . esc_attr($class) . '"><p>' . esc_html($message) . '</p></div>';
 }
