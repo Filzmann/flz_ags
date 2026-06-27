@@ -36,7 +36,54 @@ class FLZ_AGS_Database
         FLZ_AGS_Course::create_table();
         FLZ_AGS_Slot::create_table();
         FLZ_AGS_Registration::create_table();
+        self::delete_obsolete_columns();
         self::delete_legacy_tables();
+    }
+
+    /**
+     * Entfernt Spalten aus nicht produktiven Zwischenständen.
+     *
+     * dbDelta ergänzt und ändert Spalten zuverlässig, entfernt aber keine
+     * weggefallenen Felder. Da dieses Plugin noch nicht produktiv ist, halten
+     * wir das tatsächliche lokale Schema bewusst eng an den aktuellen Modellen.
+     */
+    private static function delete_obsolete_columns(): void
+    {
+        global $wpdb;
+
+        $table = FLZ_AGS_Course::database_table_name();
+        try {
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Tabellenname stammt vom Modell, Spaltenname ist fest definiert.
+            $column = $wpdb->get_var("SHOW COLUMNS FROM {$table} LIKE 'info_url'");
+        } catch (Throwable $error) {
+            throw flz_wpdb_objects\FlzWpdbObjectsException::operation(
+                'Prüfen alter AG-Spalten',
+                $table,
+                $error
+            );
+        }
+
+        if ($column === null) {
+            return;
+        }
+
+        try {
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Tabellenname stammt vom Modell, Spaltenname ist fest definiert.
+            $result = $wpdb->query("ALTER TABLE {$table} DROP COLUMN info_url");
+        } catch (Throwable $error) {
+            throw flz_wpdb_objects\FlzWpdbObjectsException::operation(
+                'Entfernen alter AG-Spalten',
+                $table,
+                $error
+            );
+        }
+        if ($result === false) {
+            throw flz_wpdb_objects\FlzWpdbObjectsException::database(
+                'Entfernen alter AG-Spalten',
+                $table,
+                (string) $wpdb->last_error
+            );
+        }
     }
 
     /**

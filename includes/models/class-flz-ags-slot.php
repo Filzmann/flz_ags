@@ -26,7 +26,7 @@ class FLZ_AGS_Slot extends FLZ_AGS_Model
     public ?string $short_description;
     public ?string $description;
     public ?string $image_url;
-    public ?string $info_url;
+    public ?int $detail_page_id;
     public ?string $category;
     public ?string $leader_name;
     public ?string $allowed_grades;
@@ -53,7 +53,7 @@ class FLZ_AGS_Slot extends FLZ_AGS_Model
         $this->short_description = $data['short_description'] ?? null;
         $this->description = $data['description'] ?? null;
         $this->image_url = $data['image_url'] ?? null;
-        $this->info_url = $data['info_url'] ?? null;
+        $this->detail_page_id = isset($data['detail_page_id']) ? (int) $data['detail_page_id'] : null;
         $this->category = $data['category'] ?? null;
         $this->leader_name = $data['leader_name'] ?? null;
         $this->allowed_grades = $data['allowed_grades'] ?? null;
@@ -75,7 +75,7 @@ class FLZ_AGS_Slot extends FLZ_AGS_Model
 
     public static function find_with_course(int $slot_id, bool $for_update = false): ?self
     {
-        $sql = 'SELECT s.*, c.title, c.allowed_grades, c.only_grade_7, c.registration_open, '
+        $sql = 'SELECT s.*, c.title, c.allowed_grades, c.only_grade_7, c.registration_open, c.detail_page_id, '
             . 'c.is_active AS course_active, c.is_visible AS course_visible '
             . 'FROM ' . static::table_name() . ' s '
             . 'INNER JOIN ' . FLZ_AGS_Course::table_name() . ' c ON c.id = s.course_id '
@@ -88,7 +88,7 @@ class FLZ_AGS_Slot extends FLZ_AGS_Model
 
     public static function find_public_for_school_year(string $school_year): array
     {
-        $sql = 'SELECT s.*, c.title, c.short_description, c.description, c.image_url, c.info_url, '
+        $sql = 'SELECT s.*, c.title, c.short_description, c.description, c.image_url, c.detail_page_id, '
             . 'c.category, c.leader_name, c.allowed_grades, c.only_grade_7, c.registration_open '
             . 'FROM ' . static::table_name() . ' s '
             . 'INNER JOIN ' . FLZ_AGS_Course::table_name() . ' c ON c.id = s.course_id '

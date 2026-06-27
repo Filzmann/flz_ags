@@ -1,6 +1,28 @@
-# Tagore AG-Verwaltung 0.3.0
+# Tagore AG-Verwaltung 0.3.3
 
 Initiale WordPress-Plugin-Version für AG-Verwaltung und AG-Anmeldung.
+
+## Neu in 0.3.3
+
+- Die Detailseite ist ausschließlich über `detail_page_id` mit einer AG
+  verknüpft; alte URL-Fallbacks wurden entfernt.
+- Demo-Daten werden aus den vorhandenen veröffentlichten AG-Unterseiten im
+  WordPress-Seitenbaum erzeugt. Es gibt keine harte Demo-AG-Liste und keine
+  erfundenen Demo-Termine mehr.
+- Zeiten, Räume, Jahrgänge und Teilnehmerzahlen werden aus den Tabellenfeldern
+  der AG-Seiten gelesen, soweit sie dort vorhanden sind.
+- Die Bilder in der Slot-Auswahl sind im Frontend kompakt begrenzt.
+
+## Neu in 0.3.2
+
+- AG-Anmeldungen laufen nicht mehr über eine globale Sammelseite, sondern
+  immer auf der Detailseite der jeweiligen AG.
+- AGs speichern eine robuste WordPress-Seiten-Verknüpfung (`detail_page_id`).
+- In der AG-Bearbeitung ersetzt eine Seitensuche das manuelle Eintragen von
+  URLs. Während der Eingabe werden passende WordPress-Seiten angeboten.
+- Direkt aus der AG-Bearbeitung kann eine neue Detailseite angelegt werden.
+  Sie wird automatisch als Unterseite der Seite „AGs“ veröffentlicht.
+- Die AG-Liste verlinkt je AG auf „Details und Anmeldung“.
 
 ## Neu in 0.3.0
 
@@ -33,7 +55,7 @@ zusätzlich über den Plugin-Header `Requires Plugins`.
 
 - AGs gelten jeweils für ein Schuljahr.
 - Jede AG hat ein Vorschaubild.
-- Eine AG kann bis zu vier wöchentliche Slots haben.
+- Eine AG kann einen oder mehrere wöchentliche Slots haben.
 - Die AG-Liste wird als Kachelübersicht ausgegeben: eine Kachel pro AG, die verfügbaren Slots stehen innerhalb der Kachel.
 - Eine Anmeldung bezieht sich auf genau einen wöchentlichen Slot und gilt bis auf Widerruf.
 - Klasse 7 kann als Pflichtwahl abgebildet werden, indem AGs zielgruppenseitig auf Klasse 7 eingeschränkt oder für Klasse 7 freigegeben werden.
@@ -45,10 +67,9 @@ zusätzlich über den Plugin-Header `Requires Plugins`.
 - Mediathek-Auswahl im Backend für Vorschaubilder.
 - Kachel-Layout der AG-Liste.
 - AG-Liste gruppiert jetzt nach AG, nicht mehr nach einzelnen Slots.
-- Optionaler Info-Link pro AG.
-- Demo-Setup mit ausgewählten AGs aus der bestehenden AG-Übersicht.
-- Lokale SVG-Demo-Vorschaubilder, damit das Demo-Setup ohne externe Bildabhängigkeit funktioniert.
-- Datenbank-Upgrade ergänzt `image_url` und `info_url`.
+- Detailseite pro AG.
+- Demo-Setup aus vorhandenen AG-Seiten.
+- Datenbank-Upgrade ergänzt `image_url`.
 
 ## Shortcodes
 
@@ -64,6 +85,16 @@ AG-Anmeldung:
 [flz_ag_anmeldung]
 ```
 
+Der Anmeldung-Shortcode wird normalerweise nicht mehr manuell platziert. Er
+wird auf der in der AG gespeicherten Detailseite automatisch ergänzt. Wird der
+Shortcode dennoch direkt verwendet, muss er auf der verknüpften Detailseite
+der AG stehen. Eine explizite `course_id` kann nur dort sinnvoll sein, wenn die
+AG nicht automatisch aus der aktuellen Seite ableitbar ist:
+
+```text
+[flz_ag_anmeldung course_id="123"]
+```
+
 Optionales Schuljahr:
 
 ```text
@@ -71,37 +102,22 @@ Optionales Schuljahr:
 [flz_ag_anmeldung school_year="2026/2027"]
 ```
 
-Optionaler Link zur Anmeldeseite in der Liste:
-
-```text
-[flz_ag_liste registration_url="/unser-angebot/ag-anmeldung/"]
-```
-
 ## Demo-Setup
 
 Nach Aktivierung:
 
-`FLZ AGs` → `Demo-Setup` → Schuljahr wählen → Demo-AGs anlegen.
+`FLZ AGs` → `Demo-Setup` → Schuljahr wählen → Demo-AGs aus AG-Seiten anlegen.
 
-Das Demo-Setup legt u. a. folgende AGs an:
-
-- Aquaristik AG
-- Basketball AG
-- Bollywood-AG
-- Instrumental AG
-- Hausaufgabenhilfe
-- Gesundes Kochen
-- Line Dance
-- Robo Cup-AG
-
-Vorhandene AGs mit gleichem Slug und Schuljahr werden nicht dupliziert. Einige Zeit-/Raumdaten sind Demo-Platzhalter und müssen vor Produktivbetrieb geprüft werden.
+Das Demo-Setup liest die veröffentlichten Unterseiten der Seite „AGs“ aus.
+Vorhandene AGs mit gleichem Slug und Schuljahr werden nicht dupliziert. Termine
+werden nur angelegt, wenn auf der AG-Seite eine erkennbare Zeitangabe vorhanden
+ist.
 
 ## Installation lokal in DDEV
 
 ```bash
-cp -r flz-ags ~/projects/tagore/wp-content/plugins/
-cd ~/projects/tagore
-ddev wp plugin activate flz-ags
+cd ~/projects/tagore-local
+ddev wp plugin activate flz_ags
 ```
 
 Danach im Backend:

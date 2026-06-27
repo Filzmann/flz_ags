@@ -19,6 +19,14 @@ use flz_wpdb_objects\FlzWpdbTransaction;
 abstract class FLZ_AGS_Model extends FlzWpdbObject
 {
     /**
+     * Liefert den intern modellabgeleiteten Tabellennamen für Infrastrukturcode.
+     */
+    public static function database_table_name(): string
+    {
+        return static::table_name();
+    }
+
+    /**
      * Führt eine vorbereitete Leseabfrage aus und prüft jeden Fehlerpfad.
      *
      * @throws FlzWpdbObjectsException Bei Datenbank- oder Abfragefehlern.

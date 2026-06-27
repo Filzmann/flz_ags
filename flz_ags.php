@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Tagore AG-Verwaltung
  * Description: Verwaltung und Anmeldung für Arbeitsgemeinschaften mit Schuljahr, Vorschaubildern, wöchentlichen Slots, Klassenlogik, Demo-Setup und CSV-Export.
- * Version: 0.3.1
+ * Version: 0.3.3
  * Author: Tagore-Gymnasium / Simon
  * Text Domain: flz-ags
  * Requires Plugins: flz_wpdb_objects, flz_ui_components
@@ -10,7 +10,7 @@
 
 defined('ABSPATH') || exit;
 
-define('FLZ_AGS_VERSION', '0.3.1');
+define('FLZ_AGS_VERSION', '0.3.3');
 define('FLZ_AGS_FILE', __FILE__);
 define('FLZ_AGS_DIR', plugin_dir_path(__FILE__));
 define('FLZ_AGS_URL', plugins_url('flz_ags/'));

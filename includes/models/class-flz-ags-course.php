@@ -15,7 +15,7 @@ class FLZ_AGS_Course extends FLZ_AGS_Model
     public ?string $short_description;
     public ?string $description;
     public ?string $image_url;
-    public ?string $info_url;
+    public ?int $detail_page_id;
     public ?string $category;
     public ?string $leader_name;
     public ?string $allowed_grades;
@@ -37,7 +37,7 @@ class FLZ_AGS_Course extends FLZ_AGS_Model
         $this->short_description = $data['short_description'] ?? null;
         $this->description = $data['description'] ?? null;
         $this->image_url = $data['image_url'] ?? null;
-        $this->info_url = $data['info_url'] ?? null;
+        $this->detail_page_id = isset($data['detail_page_id']) ? (int) $data['detail_page_id'] : 0;
         $this->category = $data['category'] ?? null;
         $this->leader_name = $data['leader_name'] ?? null;
         $this->allowed_grades = $data['allowed_grades'] ?? '';
@@ -60,6 +60,16 @@ class FLZ_AGS_Course extends FLZ_AGS_Model
         return static::query_models($sql, array($school_year), 'Laden der AGs für ein Schuljahr');
     }
 
+    public static function find_public_by_detail_page_id(int $detail_page_id, string $school_year): ?self
+    {
+        $sql = 'SELECT * FROM ' . static::table_name()
+            . ' WHERE detail_page_id = %d AND school_year = %s AND is_active = 1 AND is_visible = 1'
+            . ' ORDER BY sort_order ASC, title ASC LIMIT 1';
+        $models = static::query_models($sql, array($detail_page_id, $school_year), 'Laden einer AG zur Detailseite');
+
+        return $models[0] ?? null;
+    }
+
     protected static function get_table_schema(): string
     {
         return "(
@@ -70,7 +80,7 @@ class FLZ_AGS_Course extends FLZ_AGS_Model
             short_description text NULL,
             description longtext NULL,
             image_url varchar(500) NULL,
-            info_url varchar(500) NULL,
+            detail_page_id bigint(20) unsigned NULL,
             category varchar(190) NULL,
             leader_name varchar(190) NULL,
             allowed_grades varchar(100) NOT NULL DEFAULT '',
@@ -84,6 +94,7 @@ class FLZ_AGS_Course extends FLZ_AGS_Model
             PRIMARY KEY  (id),
             KEY school_year (school_year),
             KEY slug (slug),
+            KEY detail_page_id (detail_page_id),
             KEY active_visible (is_active, is_visible)
         )";
     }
@@ -104,7 +115,7 @@ class FLZ_AGS_Course extends FLZ_AGS_Model
             'short_description' => $this->short_description,
             'description' => $this->description,
             'image_url' => $this->image_url,
-            'info_url' => $this->info_url,
+            'detail_page_id' => $this->detail_page_id,
             'category' => $this->category,
             'leader_name' => $this->leader_name,
             'allowed_grades' => $this->allowed_grades,
