@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name: Tagore AG-Verwaltung
+ * Plugin Name: FLZ AG-Verwaltung
  * Description: Verwaltung und Anmeldung für Arbeitsgemeinschaften mit Schuljahr, Vorschaubildern, wöchentlichen Slots, Klassenlogik, Demo-Setup und CSV-Export.
- * Version: 0.3.3
+ * Version: 0.3.9
  * Author: Tagore-Gymnasium / Simon
  * Text Domain: flz-ags
  * Requires Plugins: flz_wpdb_objects, flz_ui_components
@@ -10,7 +10,7 @@
 
 defined('ABSPATH') || exit;
 
-define('FLZ_AGS_VERSION', '0.3.3');
+define('FLZ_AGS_VERSION', '0.3.9');
 define('FLZ_AGS_FILE', __FILE__);
 define('FLZ_AGS_DIR', plugin_dir_path(__FILE__));
 define('FLZ_AGS_URL', plugins_url('flz_ags/'));
@@ -55,14 +55,14 @@ require_once FLZ_AGS_DIR . 'includes/models/class-flz-ags-model.php';
 require_once FLZ_AGS_DIR . 'includes/models/class-flz-ags-course.php';
 require_once FLZ_AGS_DIR . 'includes/models/class-flz-ags-slot.php';
 require_once FLZ_AGS_DIR . 'includes/models/class-flz-ags-registration.php';
-require_once FLZ_AGS_DIR . 'includes/database.php';
+require_once FLZ_AGS_DIR . 'activate-deactivate.php';
 require_once FLZ_AGS_DIR . 'includes/class-flz-ags.php';
 
-register_activation_hook(__FILE__, array('FLZ_AGS_Database', 'activate'));
+register_activation_hook(__FILE__, 'flz_ags_activate');
 
 add_action('plugins_loaded', static function () {
     try {
-        FLZ_AGS_Database::maybe_upgrade();
+        flz_ags_maybe_upgrade();
     } catch (Throwable $error) {
         flz_ags_log_error($error, 'Aktualisieren des AG-Datenbankschemas');
         add_action('admin_notices', static function (): void {

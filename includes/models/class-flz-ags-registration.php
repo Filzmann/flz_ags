@@ -16,7 +16,7 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
     public ?string $grade_key;
     public ?string $student_first_name;
     public ?string $student_last_name;
-    public ?string $guardian_email;
+    public ?string $student_email;
     public ?string $status;
     public ?string $withdrawn_at;
     public ?string $withdrawn_reason;
@@ -41,7 +41,7 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
         $this->grade_key = $data['grade_key'] ?? null;
         $this->student_first_name = $data['student_first_name'] ?? null;
         $this->student_last_name = $data['student_last_name'] ?? null;
-        $this->guardian_email = $data['guardian_email'] ?? null;
+        $this->student_email = $data['student_email'] ?? null;
         $this->status = $data['status'] ?? 'active';
         $this->withdrawn_at = $data['withdrawn_at'] ?? null;
         $this->withdrawn_reason = $data['withdrawn_reason'] ?? null;
@@ -84,7 +84,7 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
             grade_key varchar(20) NOT NULL,
             student_first_name varchar(120) NOT NULL,
             student_last_name varchar(120) NOT NULL,
-            guardian_email varchar(190) NULL,
+            student_email varchar(190) NULL,
             status varchar(30) NOT NULL DEFAULT 'active',
             withdrawn_at datetime NULL,
             withdrawn_reason text NULL,
@@ -125,7 +125,7 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
             'grade_key' => $this->grade_key,
             'student_first_name' => $this->student_first_name,
             'student_last_name' => $this->student_last_name,
-            'guardian_email' => $this->guardian_email,
+            'student_email' => $this->student_email,
             'status' => $this->status,
             'withdrawn_at' => $this->withdrawn_at,
             'withdrawn_reason' => $this->withdrawn_reason,

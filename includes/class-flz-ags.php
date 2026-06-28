@@ -33,9 +33,67 @@ class FLZ_AGS_Plugin
         add_shortcode('flz_ag_liste', array($this, 'shortcode_list'));
         add_shortcode('flz_ag_anmeldung', array($this, 'shortcode_registration'));
 
+        add_action('init', array($this, 'register_blocks'));
         add_filter('the_content', array($this, 'append_registration_to_detail_page'));
         add_action('wp_enqueue_scripts', array($this, 'register_frontend_assets'));
         add_action('admin_enqueue_scripts', array($this, 'register_admin_assets'));
+    }
+
+    public function register_blocks(): void
+    {
+        if (!function_exists('flz_ui_register_shortcode_block')) {
+            return;
+        }
+
+        flz_ui_register_shortcode_block(array(
+            'name' => 'flz/ags-list',
+            'shortcode' => 'flz_ag_liste',
+            'title' => 'FLZ AG-Liste',
+            'description' => 'Öffentliche Übersicht der veröffentlichten AGs mit Detailseiten.',
+            'icon' => 'groups',
+            'keywords' => array('ag', 'arbeitsgemeinschaft', 'flz'),
+            'attributes' => array(
+                'school_year' => array(
+                    'type' => 'string',
+                    'default' => '',
+                ),
+            ),
+            'fields' => array(
+                'school_year' => array(
+                    'label' => 'Schuljahr',
+                    'description' => 'Optional, z. B. 2026/2027. Leer verwendet das aktuelle AG-Schuljahr.',
+                ),
+            ),
+        ));
+
+        flz_ui_register_shortcode_block(array(
+            'name' => 'flz/ag-registration',
+            'shortcode' => 'flz_ag_anmeldung',
+            'title' => 'FLZ AG-Anmeldung',
+            'description' => 'Anmeldeformular für die verknüpfte AG-Detailseite.',
+            'icon' => 'forms',
+            'keywords' => array('ag', 'anmeldung', 'flz'),
+            'attributes' => array(
+                'school_year' => array(
+                    'type' => 'string',
+                    'default' => '',
+                ),
+                'course_id' => array(
+                    'type' => 'string',
+                    'default' => '',
+                ),
+            ),
+            'fields' => array(
+                'school_year' => array(
+                    'label' => 'Schuljahr',
+                    'description' => 'Optional, z. B. 2026/2027. Leer verwendet das aktuelle AG-Schuljahr.',
+                ),
+                'course_id' => array(
+                    'label' => 'AG-ID',
+                    'description' => 'Optional. Normalerweise leer lassen, damit die Detailseite die AG bestimmt.',
+                ),
+            ),
+        ));
     }
 
     public function register_frontend_assets(): void
@@ -152,7 +210,7 @@ class FLZ_AGS_Plugin
         try {
             $parent_id = flz_ags_detail_parent_page_id();
             if ($parent_id <= 0) {
-                wp_send_json_error(array('message' => 'Die übergeordnete Seite „AGs“ wurde nicht gefunden.'), 400);
+                wp_send_json_error(array('message' => 'Die AG-Hauptseite wurde nicht gefunden. Bitte zuerst unter „FLZ AGs → Einstellungen“ auswählen.'), 400);
             }
 
             $page_id = wp_insert_post(
@@ -222,7 +280,15 @@ class FLZ_AGS_Plugin
             ));
             $this->rendering_embedded_registration = false;
 
-            return $content . $registration;
+            return $content . flz_ui()->floating_action_panel(array(
+                'id' => 'flz-ags-registration-panel-' . (int) $course->id,
+                'title' => 'AG-Anmeldung',
+                'button_label' => !empty($course->registration_open) ? 'Jetzt AG anmelden' : 'AG-Anmeldung anzeigen',
+                'button_icon' => 'check',
+                'content' => $registration,
+                'open' => $this->is_registration_post_for_course((int) $course->id),
+                'class' => 'flz-ags-registration-panel',
+            ));
         } catch (Throwable $error) {
             $this->rendering_embedded_registration = false;
             flz_ags_log_error($error, 'Automatisches Einbetten der AG-Anmeldung');
@@ -331,6 +397,19 @@ class FLZ_AGS_Plugin
         return null;
     }
 
+    private function is_registration_post_for_course(int $course_id): bool
+    {
+        $request_method = isset($_SERVER['REQUEST_METHOD']) ? sanitize_key(wp_unslash($_SERVER['REQUEST_METHOD'])) : '';
+        if ('post' !== $request_method) {
+            return false;
+        }
+
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Hier wird nur entschieden, ob das bereits gerenderte Panel nach einem POST offen angezeigt wird. Die Verarbeitung prüft die Nonce in handle_frontend_registration().
+        $posted_course_id = isset($_POST['flz_ags_course_id']) ? absint(wp_unslash($_POST['flz_ags_course_id'])) : 0;
+
+        return $course_id > 0 && $posted_course_id === $course_id;
+    }
+
     private function build_page_payload(int $page_id): array
     {
         $page = get_post($page_id);
@@ -382,7 +461,7 @@ class FLZ_AGS_Plugin
                 $slot_labels[] = flz_ags_weekday_label($slot->weekday) . ', ' . flz_ags_format_time($slot->start_time) . '–' . flz_ags_format_time($slot->end_time) . ($slot->room ? ', ' . $slot->room : '');
             }
 
-            $target = $course->only_grade_7 ? 'nur Klasse 7' : ($course->allowed_grades ? $course->allowed_grades : 'alle');
+            $target = $course->only_grade_7 ? 'nur Klasse 7' : flz_ags_allowed_grades_label((string) $course->allowed_grades);
             $status = array();
             $status[] = $course->is_active ? 'aktiv' : 'inaktiv';
             $status[] = $course->is_visible ? 'sichtbar' : 'versteckt';
@@ -421,7 +500,7 @@ class FLZ_AGS_Plugin
         $this->admin_detail_page_row($course);
         $this->admin_textarea_row('Kurzbeschreibung', 'short_description', $course->short_description ?? '', 3);
         $this->admin_textarea_row('Beschreibung', 'description', $course->description ?? '', 6);
-        $this->admin_text_row('Erlaubte Jahrgänge', 'allowed_grades', $course->allowed_grades ?? '', 'Leer = alle; erlaubt: 7,8,9,10,11,12,WKK');
+        $this->admin_text_row('Erlaubte Jahrgänge', 'allowed_grades', $course->allowed_grades ?? '', 'Leer = alle; erlaubt: 7,8,9,10,11,12. Einzelklassen wie 7.1 werden automatisch auf den Jahrgang 7 reduziert.');
 
         echo '<tr><th scope="row">Regeln/Status</th><td>';
         $this->admin_checkbox('only_grade_7', 'nur Klasse 7', !empty($course->only_grade_7));
@@ -521,30 +600,62 @@ class FLZ_AGS_Plugin
 
     private function admin_detail_page_row(?object $course): void
     {
-        $ui = flz_ui();
         $detail_page_id = $course ? flz_ags_course_detail_page_id($course) : 0;
-        $selected_label = $detail_page_id > 0 ? flz_ags_page_label($detail_page_id) : 'Keine Detailseite ausgewählt.';
-        $selected_permalink = $detail_page_id > 0 ? get_permalink($detail_page_id) : '';
-        $selected_edit_url = $detail_page_id > 0 ? get_edit_post_link($detail_page_id, '') : '';
 
-        echo '<tr><th scope="row"><label for="flz_ags_detail_page_search">Detailseite</label></th><td>';
-        echo '<div class="flz-ags-page-field" data-flz-ags-page-field>';
-        echo '<input type="hidden" name="detail_page_id" data-flz-ags-page-id value="' . esc_attr((string) $detail_page_id) . '">';
+        $this->admin_page_picker_row(
+            'Detailseite',
+            'detail_page_id',
+            'flz_ags_detail_page_search',
+            $detail_page_id,
+            'Keine Detailseite ausgewählt.',
+            'AG-Detailseite suchen',
+            'Die Anmeldung wird automatisch auf dieser AG-Detailseite angezeigt. Neue Detailseiten werden als Unterseite der eingestellten AG-Hauptseite veröffentlicht.',
+            true,
+            'Neue Detailseite anlegen',
+            '#title'
+        );
+    }
+
+    private function admin_page_picker_row(
+        string $label,
+        string $hidden_name,
+        string $search_id,
+        int $page_id,
+        string $empty_label,
+        string $search_label,
+        string $description,
+        bool $allow_create = false,
+        string $create_label = '',
+        string $title_source = ''
+    ): void {
+        $ui = flz_ui();
+        $safe_hidden_name = sanitize_key($hidden_name);
+        $safe_search_id = sanitize_key($search_id);
+        $safe_search_label = sanitize_text_field($search_label);
+        $selected_label = $page_id > 0 ? flz_ags_page_label($page_id) : $empty_label;
+        $selected_permalink = $page_id > 0 ? get_permalink($page_id) : '';
+        $selected_edit_url = $page_id > 0 ? get_edit_post_link($page_id, '') : '';
+
+        echo '<tr><th scope="row"><label for="' . esc_attr($safe_search_id) . '">' . esc_html($label) . '</label></th><td>';
+        echo '<div class="flz-ags-page-field" data-flz-ags-page-field data-empty-label="' . esc_attr($empty_label) . '">';
+        echo '<input type="hidden" name="' . esc_attr($safe_hidden_name) . '" data-flz-ags-page-id value="' . esc_attr((string) $page_id) . '">';
         echo '<div class="flz-ags-page-search-row">';
         // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
         echo $ui->input('text', array(
-            'name' => 'detail_page_search',
-            'id' => 'flz_ags_detail_page_search',
+            'name' => $safe_hidden_name . '_search', // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
+            'id' => $safe_search_id, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
             'value' => '',
             'placeholder' => 'Seitentitel suchen …',
             'input_class' => 'regular-text',
             'attrs' => array(
                 'autocomplete' => 'off',
                 'data-flz-ags-page-search' => true,
-                'aria-label' => 'AG-Detailseite suchen',
+                'aria-label' => $safe_search_label, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
             ),
         ));
-        echo $ui->button_new(array('label' => 'Neue Detailseite anlegen', 'type' => 'button', 'attrs' => array('data-flz-ags-create-detail-page' => true, 'data-title-source' => '#title'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
+        if ($allow_create) {
+            echo $ui->button_new(array('label' => $create_label, 'type' => 'button', 'attrs' => array('data-flz-ags-create-detail-page' => true, 'data-title-source' => $title_source))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
+        }
         echo $ui->button_clear(array('label' => 'Auswahl entfernen', 'type' => 'button', 'attrs' => array('data-flz-ags-clear-detail-page' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
         echo '</div>';
         echo '<div class="flz-ags-page-selected" data-flz-ags-page-selected>';
@@ -557,7 +668,7 @@ class FLZ_AGS_Plugin
         }
         echo '</div>';
         echo '<div class="flz-ags-page-results" data-flz-ags-page-results role="listbox" aria-live="polite"></div>';
-        echo '<p class="description">Die Anmeldung wird automatisch auf dieser AG-Detailseite angezeigt. Neue Detailseiten werden als Unterseite von „AGs“ veröffentlicht.</p>';
+        echo '<p class="description">' . esc_html($description) . '</p>';
         echo '</div>';
         echo '</td></tr>';
     }
@@ -585,7 +696,7 @@ class FLZ_AGS_Plugin
         $title = isset($_POST['title']) ? sanitize_text_field(wp_unslash($_POST['title'])) : '';
 
         if ($title === '') {
-            wp_die('Der Titel ist erforderlich.');
+            wp_die(esc_html__('Der Titel ist erforderlich.', 'flz-ags'));
         }
 
         $school_year = isset($_POST['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_POST['school_year']))) : flz_ags_current_school_year();
@@ -723,23 +834,74 @@ class FLZ_AGS_Plugin
     {
         $this->assert_admin_permission();
         $ui = flz_ui();
+        $parent_page_id = flz_ags_detail_parent_page_id();
+        $configured_parent_page_id = flz_ags_configured_detail_parent_page_id();
+        $parent_hint = $parent_page_id > 0
+            ? flz_ags_page_label($parent_page_id)
+            : 'Noch keine AG-Hauptseite ausgewählt oder automatisch gefunden.';
 
         echo '<div class="wrap flz-ags-admin">';
         echo '<h1>FLZ AGs – Einstellungen</h1>';
         if (isset($_GET['saved'])) {
             echo wp_kses_post(flz_ags_notice('Einstellungen gespeichert.'));
         }
+        if (isset($_GET['flz_ags_error'])) {
+            $error_code = sanitize_key(wp_unslash($_GET['flz_ags_error']));
+            echo wp_kses_post(flz_ags_notice(flz_ags_error_message($error_code), 'error'));
+        }
+
+        echo '<p class="description">Hier werden die Grunddaten gepflegt, die Lehrkräfte und Sekretariat im Alltag benötigen: aktuelles Schuljahr, öffentliche AG-Hauptseite und die Klassenliste für das Anmeldeformular.</p>';
 
         echo $ui->form_start(array('method' => 'post', 'action' => admin_url('admin-post.php'), 'nonce' => 'flz_ags_save_settings', 'hidden' => array('action' => 'flz_ags_save_settings'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formular.
+
+        echo '<div class="flz-ags-settings-grid">';
+        echo '<section class="flz-ags-settings-card">';
+        echo '<h2>Grunddaten</h2>';
         echo '<table class="form-table" role="presentation"><tbody>';
         echo '<tr><th scope="row"><label for="flz_ags_current_school_year">Aktuelles Schuljahr</label></th><td>';
         echo $ui->input('text', array('name' => 'current_school_year', 'id' => 'flz_ags_current_school_year', 'value' => flz_ags_current_school_year(), 'description' => 'Format: 2026/2027. AGs und Anmeldungen werden schuljahrbezogen geführt.', 'input_class' => 'regular-text', 'attrs' => array('aria-label' => 'Aktuelles Schuljahr'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
         echo '</td></tr>';
-        echo '<tr><th scope="row"><label for="flz_ags_classes">Klassen/Kurse</label></th><td>';
-        echo $ui->field(array('type' => 'textarea', 'name' => 'classes_text', 'id' => 'flz_ags_classes', 'value' => implode("\n", flz_ags_get_classes()), 'rows' => 12, 'description' => 'Eine Klasse/ein Kurs pro Zeile. Diese Liste wird im Anmeldeformular als Dropdown verwendet.', 'input_class' => 'large-text code', 'attrs' => array('aria-label' => 'Klassen/Kurse'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
+        $this->admin_page_picker_row(
+            'AG-Hauptseite',
+            'parent_page_id',
+            'flz_ags_parent_page_search',
+            $parent_page_id,
+            'Keine AG-Hauptseite ausgewählt.',
+            'AG-Hauptseite suchen',
+            'Unter dieser Seite werden neue AG-Detailseiten angelegt. Das Demo-Setup liest veröffentlichte Unterseiten dieser Seite.',
+            false
+        );
+        echo '</tbody></table>';
+        echo '<p class="flz-ags-settings-summary"><strong>Aktuell verwendet:</strong> ' . esc_html($parent_hint) . '</p>';
+        if ($configured_parent_page_id <= 0 && $parent_page_id > 0) {
+            echo '<p class="description">Diese Seite wurde automatisch gefunden. Beim Speichern wird sie fest als AG-Hauptseite übernommen.</p>';
+        }
+        echo '</section>';
+
+        echo '<section class="flz-ags-settings-card">';
+        echo '<h2>Klassen im Anmeldeformular</h2>';
+        echo '<p class="description">Schüler*innen wählen hier ihre echte Klasse, z. B. 7.1 oder 8.5. Für AG-Zielgruppen wird beim Absenden automatisch nur der Jahrgang geprüft.</p>';
+        echo '<table class="form-table" role="presentation"><tbody>';
+        echo '<tr><th scope="row"><label for="flz_ags_classes">Klassen im Anmeldeformular</label></th><td>';
+        echo $ui->field(array('type' => 'textarea', 'name' => 'classes_text', 'id' => 'flz_ags_classes', 'value' => implode("\n", flz_ags_get_classes()), 'rows' => 12, 'description' => 'Eine Klasse pro Zeile, z. B. 7.1 oder 8.5. Für AG-Zielgruppen und Slot-Prüfung wird daraus automatisch der Jahrgang abgeleitet.', 'input_class' => 'large-text code', 'attrs' => array('aria-label' => 'Klassen im Anmeldeformular'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
+        echo '</td></tr>';
+        echo '<tr><th scope="row">Standardliste</th><td>';
+        echo $ui->field(array('type' => 'checkbox', 'name' => 'reset_classes', 'label' => 'Beim Speichern die Standard-Klassenliste wiederherstellen', 'description' => 'Hilfreich, wenn die Liste versehentlich gekürzt oder beschädigt wurde.')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
         echo '</td></tr>';
         echo '</tbody></table>';
-        echo '<p>' . $ui->button_save(array('label' => 'Einstellungen speichern')) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
+        echo '</section>';
+
+        echo '<section class="flz-ags-settings-card flz-ags-settings-help">';
+        echo '<h2>Was bedeutet das?</h2>';
+        echo '<ul>';
+        echo '<li><strong>AG-Hauptseite:</strong> öffentliche Übersichtsseite, unter der die einzelnen AG-Detailseiten liegen.</li>';
+        echo '<li><strong>Detailseiten:</strong> auf ihnen erscheint automatisch der Anmeldebutton mit Formular.</li>';
+        echo '<li><strong>Klassen:</strong> nur für das Anmeldeformular. Die AG-Freigabe selbst arbeitet weiter mit Jahrgängen.</li>';
+        echo '</ul>';
+        echo '</section>';
+        echo '</div>';
+
+        echo '<p class="submit">' . $ui->button_save(array('label' => 'Einstellungen speichern')) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
         echo $ui->form_end(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formularende.
         echo '</div>';
     }
@@ -751,10 +913,25 @@ class FLZ_AGS_Plugin
 
         $school_year = isset($_POST['current_school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_POST['current_school_year']))) : flz_ags_default_school_year();
         $classes_text = isset($_POST['classes_text']) ? sanitize_textarea_field(wp_unslash($_POST['classes_text'])) : '';
-        $classes = flz_ags_sanitize_classes_from_text($classes_text);
+        $classes = isset($_POST['reset_classes']) ? flz_ags_default_classes() : flz_ags_sanitize_classes_from_text($classes_text);
+        $parent_page_id = isset($_POST['parent_page_id']) ? absint(wp_unslash($_POST['parent_page_id'])) : 0;
 
-        update_option('flz_ags_current_school_year', $school_year, false);
-        update_option('flz_ags_classes', !empty($classes) ? $classes : flz_ags_default_classes(), false);
+        try {
+            if ($parent_page_id > 0) {
+                $parent_page_id = $this->validate_detail_page_id($parent_page_id);
+            }
+
+            update_option('flz_ags_current_school_year', $school_year, false);
+            update_option('flz_ags_classes', !empty($classes) ? $classes : flz_ags_default_classes(), false);
+            update_option('flz_ags_parent_page_id', $parent_page_id, false);
+        } catch (Throwable $error) {
+            $this->redirect_admin_error(
+                $error,
+                'Speichern der AG-Einstellungen',
+                'save-settings',
+                array('page' => 'flz-ags-settings')
+            );
+        }
 
         flz_ags_safe_redirect(flz_ags_admin_url(array('page' => 'flz-ags-settings', 'saved' => 1)));
     }
@@ -779,7 +956,7 @@ class FLZ_AGS_Plugin
         echo $ui->form_end(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formularende.
 
         if (empty($demo)) {
-            echo wp_kses_post(flz_ags_notice('Es wurden keine veröffentlichten AG-Unterseiten unter der Seite „AGs“ gefunden.', 'error'));
+            echo wp_kses_post(flz_ags_notice('Es wurden keine veröffentlichten AG-Unterseiten unter der eingestellten AG-Hauptseite gefunden.', 'error'));
             echo '</div>';
             return;
         }
@@ -799,7 +976,7 @@ class FLZ_AGS_Plugin
                 'text'      => $course['short_description'],
                 'meta'      => array(
                     'Detailseite' => flz_ags_page_label((int) $course['detail_page_id']),
-                    'Jahrgänge'   => $course['allowed_grades'],
+                    'Jahrgänge'   => flz_ags_allowed_grades_label((string) $course['allowed_grades']),
                     'Termine'     => count($course['slots']),
                 ),
             );
@@ -948,11 +1125,12 @@ class FLZ_AGS_Plugin
     {
         $weekdays = flz_ags_weekdays();
         $ui = flz_ui();
+        $class_options = $include_classes ? flz_ags_class_options() : flz_ags_grade_options();
         echo '<div class="flz-ags-filters">';
         if ($include_classes) {
-            echo $ui->field(array('type' => 'select', 'name' => 'class_name', 'label' => 'Klasse/Kurs', 'required' => true, 'placeholder' => '– Bitte auswählen –', 'options' => array_combine(flz_ags_get_classes(), flz_ags_get_classes()), 'attrs' => array('data-flz-ags-class-select' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
+            echo $ui->field(array('type' => 'select', 'name' => 'class_name', 'label' => 'Klasse', 'required' => true, 'placeholder' => '– Bitte auswählen –', 'options' => $class_options, 'attrs' => array('data-flz-ags-class-select' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
         } else {
-            echo $ui->field(array('type' => 'select', 'name' => 'class_filter', 'label' => 'Klasse/Kurs', 'placeholder' => 'alle anzeigen', 'options' => array_combine(flz_ags_get_classes(), flz_ags_get_classes()), 'attrs' => array('data-flz-ags-class-select' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
+            echo $ui->field(array('type' => 'select', 'name' => 'class_filter', 'label' => 'Jahrgang', 'placeholder' => 'alle anzeigen', 'options' => $class_options, 'attrs' => array('data-flz-ags-class-select' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
         }
 
         echo $ui->field(array('type' => 'select', 'name' => 'weekday_filter', 'label' => 'Wochentag', 'placeholder' => 'alle Tage', 'options' => $weekdays, 'attrs' => array('data-flz-ags-weekday-select' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
@@ -986,7 +1164,7 @@ class FLZ_AGS_Plugin
         }
 
         $weekdays = array_values(array_unique($weekdays));
-        $target = $course->only_grade_7 ? 'nur Klasse 7' : ($course->allowed_grades ? 'Jahrgänge ' . $course->allowed_grades : 'alle Jahrgänge');
+        $target = $course->only_grade_7 ? 'nur Klasse 7' : flz_ags_allowed_grades_label((string) $course->allowed_grades);
         $meta = array();
         if (!empty($course->category)) {
             $meta['Bereich'] = $course->category;
@@ -1074,7 +1252,7 @@ class FLZ_AGS_Plugin
 
             $request_method = isset($_SERVER['REQUEST_METHOD']) ? sanitize_key(wp_unslash($_SERVER['REQUEST_METHOD'])) : '';
             // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Die Nonce wird direkt in handle_frontend_registration() geprüft und liefert dort die fachliche Fehlermeldung.
-            if ('POST' === $request_method && isset($_POST['flz_ags_nonce'])) {
+            if ('post' === $request_method && isset($_POST['flz_ags_registration_submit'])) {
                 $result = $this->handle_frontend_registration($school_year, (int) $course->id);
                 $messages = $result['messages'];
                 $success = $result['success'];
@@ -1099,6 +1277,129 @@ class FLZ_AGS_Plugin
         }
     }
 
+    private function send_registration_confirmation_email(FLZ_AGS_Registration $registration, object $slot): void
+    {
+        $recipient = sanitize_email((string) $registration->student_email);
+        if ($recipient === '' || !is_email($recipient)) {
+            throw new UnexpectedValueException('Für die AG-Bestätigungsmail fehlt eine gültige Empfängeradresse.');
+        }
+
+        $site_name = sanitize_text_field(wp_specialchars_decode((string) get_bloginfo('name'), ENT_QUOTES));
+        $admin_email = sanitize_email((string) get_option('admin_email'));
+        $detail_url = get_permalink((int) get_queried_object_id());
+        $slot_line = flz_ags_weekday_label($slot->weekday)
+            . ', '
+            . flz_ags_format_time($slot->start_time)
+            . '–'
+            . flz_ags_format_time($slot->end_time)
+            . (!empty($slot->room) ? ', Raum ' . $slot->room : '');
+
+        $subject = 'AG-Anmeldung bestätigt: ' . (string) $slot->title;
+        $message = implode("\n", array_filter(array(
+            'Hallo,',
+            '',
+            'die AG-Anmeldung wurde gespeichert.',
+            '',
+            'Schüler*in: ' . (string) $registration->student_first_name . ' ' . (string) $registration->student_last_name,
+            'Klasse: ' . flz_ags_class_label((string) $registration->class_name),
+            'AG: ' . (string) $slot->title,
+            'Termin: ' . $slot_line,
+            'Schuljahr: ' . (string) $registration->school_year,
+            '',
+            is_string($detail_url) && $detail_url !== '' ? 'Detailseite: ' . $detail_url : '',
+            '',
+            'Die Anmeldung gilt bis auf Widerruf. Änderungen oder Widerrufe bitte über die Schule veranlassen.',
+            '',
+            'Viele Grüße',
+            $site_name !== '' ? $site_name : 'Tagore-Gymnasium',
+        )));
+        $headers = array('Content-Type: text/plain; charset=UTF-8');
+        if ($admin_email !== '') {
+            $headers[] = 'From: ' . ($site_name !== '' ? $site_name : 'Tagore-Gymnasium') . ' <' . $admin_email . '>';
+        }
+
+        /**
+         * Erlaubt lokale Tests oder spätere Fachanpassungen ohne Änderung der
+         * Anmeldelogik. DDEV fängt wp_mail() üblicherweise in Mailpit/MailHog ab.
+         */
+        $mail = apply_filters(
+            'flz_ags_confirmation_mail',
+            array(
+                'to'      => $recipient,
+                'subject' => $subject,
+                'message' => $message,
+                'headers' => $headers,
+            ),
+            $registration,
+            $slot
+        );
+
+        if (!is_array($mail) || empty($mail['to']) || empty($mail['subject']) || empty($mail['message'])) {
+            throw new UnexpectedValueException('Die AG-Bestätigungsmail wurde durch einen Filter ungültig konfiguriert.');
+        }
+
+        $sent = wp_mail(
+            (string) $mail['to'],
+            (string) $mail['subject'],
+            (string) $mail['message'],
+            isset($mail['headers']) && is_array($mail['headers']) ? $mail['headers'] : array()
+        );
+
+        if (!$sent) {
+            if ($this->mock_registration_confirmation_email($mail, $registration, $slot)) {
+                return;
+            }
+
+            throw new RuntimeException('wp_mail() meldete einen Fehler beim Senden der AG-Bestätigungsmail.');
+        }
+    }
+
+    /**
+     * Speichert lokale Mock-Mails, wenn die DDEV-Mailzustellung blockiert ist.
+     *
+     * In DDEV sollte Mailpit normale wp_mail()-Aufrufe abfangen. Falls ein
+     * lokales SMTP-Plugin den Versand vorher ablehnt, bleibt der
+     * Anmeldeprozess mit diesem lokalen Fallback trotzdem testbar. Außerhalb
+     * der lokalen Umgebung ist der Mock standardmäßig aus.
+     *
+     * @param array<string,mixed> $mail Normalisierte Maildaten.
+     */
+    private function mock_registration_confirmation_email(array $mail, FLZ_AGS_Registration $registration, object $slot): bool
+    {
+        $should_mock = wp_get_environment_type() === 'local';
+        $should_mock = (bool) apply_filters(
+            'flz_ags_mock_confirmation_mail',
+            $should_mock,
+            $mail,
+            $registration,
+            $slot
+        );
+
+        if (!$should_mock) {
+            return false;
+        }
+
+        $mails = get_option('flz_ags_mock_confirmation_mails', array());
+        if (!is_array($mails)) {
+            $mails = array();
+        }
+
+        $mails[] = array(
+            'created_at' => current_time('mysql'),
+            'to' => (string) $mail['to'],
+            'subject' => (string) $mail['subject'],
+            'message' => (string) $mail['message'],
+            'course_id' => (int) $registration->course_id,
+            'slot_id' => (int) $registration->slot_id,
+            'student' => trim((string) $registration->student_first_name . ' ' . (string) $registration->student_last_name),
+            'class_name' => flz_ags_class_label((string) $registration->class_name),
+            'course_title' => (string) $slot->title,
+        );
+
+        update_option('flz_ags_mock_confirmation_mails', array_slice($mails, -20), false);
+        return true;
+    }
+
     private function render_registration_form(string $school_year, FLZ_AGS_Course $course): void
     {
         $slots = array_filter($this->get_public_slots($school_year), static function ($slot) use ($course) {
@@ -1110,24 +1411,24 @@ class FLZ_AGS_Plugin
             'class_name' => '',
             'student_first_name' => '',
             'student_last_name' => '',
-            'guardian_email' => '',
+            'student_email' => '',
             'slot_id' => 0,
         );
 
         if (isset($_POST['flz_ags_nonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['flz_ags_nonce'])), 'flz_ags_frontend_registration')) {
-            $posted['class_name'] = isset($_POST['class_name']) ? sanitize_text_field(wp_unslash($_POST['class_name'])) : '';
+            $posted['class_name'] = isset($_POST['class_name']) ? flz_ags_normalize_class_name(sanitize_text_field(wp_unslash($_POST['class_name']))) : '';
             $posted['student_first_name'] = isset($_POST['student_first_name']) ? sanitize_text_field(wp_unslash($_POST['student_first_name'])) : '';
             $posted['student_last_name'] = isset($_POST['student_last_name']) ? sanitize_text_field(wp_unslash($_POST['student_last_name'])) : '';
-            $posted['guardian_email'] = isset($_POST['guardian_email']) ? sanitize_email(wp_unslash($_POST['guardian_email'])) : '';
+            $posted['student_email'] = isset($_POST['student_email']) ? sanitize_email(wp_unslash($_POST['student_email'])) : '';
             $posted['slot_id'] = isset($_POST['slot_id']) ? absint($_POST['slot_id']) : 0;
         }
 
         echo $ui->form_start(array('method' => 'post', 'class' => 'flz-ags-registration-form', 'nonce' => 'flz_ags_frontend_registration', 'nonce_name' => 'flz_ags_nonce', 'hidden' => array('flz_ags_registration_submit' => '1', 'flz_ags_course_id' => (int) $course->id), 'attrs' => array('data-flz-ags-registration-form' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formular.
         echo '<div class="flz-ags-form-grid">';
-        echo $ui->field(array('type' => 'select', 'name' => 'class_name', 'label' => 'Klasse/Kurs', 'value' => $posted['class_name'], 'required' => true, 'placeholder' => '– Bitte auswählen –', 'options' => array_combine(flz_ags_get_classes(), flz_ags_get_classes()), 'attrs' => array('data-flz-ags-class-select' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
+        echo $ui->field(array('type' => 'select', 'name' => 'class_name', 'label' => 'Klasse', 'value' => $posted['class_name'], 'required' => true, 'placeholder' => '– Bitte auswählen –', 'options' => flz_ags_class_options(), 'attrs' => array('data-flz-ags-class-select' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
         echo $ui->input('text', array('name' => 'student_first_name', 'label' => 'Vorname Schüler*in', 'value' => $posted['student_first_name'], 'required' => true)); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
         echo $ui->input('text', array('name' => 'student_last_name', 'label' => 'Nachname Schüler*in', 'value' => $posted['student_last_name'], 'required' => true)); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
-        echo $ui->input('email', array('name' => 'guardian_email', 'label' => 'E-Mail Erziehungsberechtigte*r / Kontakt', 'value' => $posted['guardian_email'], 'autocomplete' => 'email')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
+        echo $ui->input('email', array('name' => 'student_email', 'label' => 'E-Mail Schüler*in', 'value' => $posted['student_email'], 'required' => true, 'autocomplete' => 'email')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
         echo '</div>';
 
         echo '<fieldset class="flz-ags-slot-fieldset"><legend>AG-Slot auswählen</legend>';
@@ -1141,7 +1442,7 @@ class FLZ_AGS_Plugin
                 $free_label = $max > 0 ? max(0, $max - $taken) . ' freie Plätze' : 'keine Begrenzung hinterlegt';
                 $checked = $posted['slot_id'] === (int) $slot->id;
                 $time_label = flz_ags_weekday_label($slot->weekday) . ', ' . flz_ags_format_time($slot->start_time) . '–' . flz_ags_format_time($slot->end_time);
-                $target_label = $slot->only_grade_7 ? 'nur Klasse 7' : ($slot->allowed_grades ? 'Jahrgänge ' . $slot->allowed_grades : 'alle Jahrgänge');
+                $target_label = $slot->only_grade_7 ? 'nur Klasse 7' : flz_ags_allowed_grades_label((string) $slot->allowed_grades);
 
                 $slot_choice_args = array(
                     'name'      => 'slot_id',
@@ -1186,10 +1487,10 @@ class FLZ_AGS_Plugin
         }
 
         $posted_course_id = isset($_POST['flz_ags_course_id']) ? absint($_POST['flz_ags_course_id']) : 0;
-        $class_name = isset($_POST['class_name']) ? sanitize_text_field(wp_unslash($_POST['class_name'])) : '';
+        $class_name = isset($_POST['class_name']) ? flz_ags_normalize_class_name(sanitize_text_field(wp_unslash($_POST['class_name']))) : '';
         $first_name = isset($_POST['student_first_name']) ? sanitize_text_field(wp_unslash($_POST['student_first_name'])) : '';
         $last_name = isset($_POST['student_last_name']) ? sanitize_text_field(wp_unslash($_POST['student_last_name'])) : '';
-        $guardian_email = isset($_POST['guardian_email']) ? sanitize_email(wp_unslash($_POST['guardian_email'])) : '';
+        $student_email = isset($_POST['student_email']) ? sanitize_email(wp_unslash($_POST['student_email'])) : '';
         $slot_id = isset($_POST['slot_id']) ? absint($_POST['slot_id']) : 0;
         $consent = isset($_POST['consent_privacy']) ? 1 : 0;
 
@@ -1197,13 +1498,13 @@ class FLZ_AGS_Plugin
             $messages[] = 'Die AG-Zuordnung der Anmeldung ist ungültig. Bitte die Detailseite neu laden.';
         }
         if (!flz_ags_is_valid_class($class_name)) {
-            $messages[] = 'Bitte eine gültige Klasse/einen gültigen Kurs auswählen.';
+            $messages[] = 'Bitte eine gültige Klasse auswählen.';
         }
         if ($first_name === '' || $last_name === '') {
             $messages[] = 'Bitte Vor- und Nachname der Schülerin/des Schülers eintragen.';
         }
-        if ($guardian_email !== '' && !is_email($guardian_email)) {
-            $messages[] = 'Bitte eine gültige E-Mail-Adresse eintragen oder das Feld leer lassen.';
+        if ($student_email === '' || !is_email($student_email)) {
+            $messages[] = 'Bitte eine gültige E-Mail-Adresse der Schülerin/des Schülers für die Bestätigung eintragen.';
         }
         if ($slot_id <= 0) {
             $messages[] = 'Bitte einen AG-Slot auswählen.';
@@ -1217,8 +1518,8 @@ class FLZ_AGS_Plugin
         }
 
         try {
-            return FLZ_AGS_Model::transaction(
-                function () use ($school_year, $course_id, $class_name, $first_name, $last_name, $guardian_email, $slot_id, $consent): array {
+            $result = FLZ_AGS_Model::transaction(
+                function () use ($school_year, $course_id, $class_name, $first_name, $last_name, $student_email, $slot_id, $consent): array {
                     // Die Sperre serialisiert Kapazitätsprüfungen und Insert für diesen Termin.
                     $slot = $this->get_slot_with_course($slot_id, true);
                     if (
@@ -1234,7 +1535,7 @@ class FLZ_AGS_Plugin
                     }
 
                     if (!flz_ags_grade_is_allowed($class_name, (string) $slot->allowed_grades, !empty($slot->only_grade_7))) {
-                        return array('success' => false, 'messages' => array('Dieser AG-Slot ist für die gewählte Klasse nicht freigegeben.'));
+                        return array('success' => false, 'messages' => array('Dieser AG-Slot ist für den gewählten Jahrgang nicht freigegeben.'));
                     }
 
                     $taken = $this->count_active_registrations((int) $slot->id);
@@ -1265,7 +1566,7 @@ class FLZ_AGS_Plugin
                         'grade_key' => flz_ags_extract_grade_key($class_name),
                         'student_first_name' => $first_name,
                         'student_last_name' => $last_name,
-                        'guardian_email' => $guardian_email,
+                        'student_email' => $student_email,
                         'status' => 'active',
                         'consent_privacy' => $consent,
                         'created_at' => $now,
@@ -1275,11 +1576,32 @@ class FLZ_AGS_Plugin
 
                     return array(
                         'success' => true,
-                        'messages' => array('Die AG-Anmeldung wurde gespeichert. Die Teilnahme gilt bis auf Widerruf.'),
+                        'messages' => array('Die AG-Anmeldung wurde gespeichert. Eine Bestätigung wurde per E-Mail versendet.'),
+                        'registration' => $registration,
+                        'slot' => $slot,
                     );
                 },
                 'Prüfen und Speichern einer AG-Anmeldung'
             );
+
+            if (
+                !empty($result['success'])
+                && isset($result['registration'], $result['slot'])
+                && $result['registration'] instanceof FLZ_AGS_Registration
+                && is_object($result['slot'])
+            ) {
+                try {
+                    $this->send_registration_confirmation_email($result['registration'], $result['slot']);
+                } catch (Throwable $mail_error) {
+                    flz_ags_log_error($mail_error, 'Senden der AG-Bestätigungsmail nach gespeicherter Anmeldung');
+                    $result['messages'] = array(
+                        'Die AG-Anmeldung wurde gespeichert, aber die Bestätigungsmail konnte nicht versendet werden. Bitte kontaktieren Sie die Schule.',
+                    );
+                }
+            }
+
+            unset($result['registration'], $result['slot']);
+            return $result;
         } catch (Throwable $error) {
             flz_ags_log_error($error, 'Speichern einer öffentlichen AG-Anmeldung');
             return array(
@@ -1332,17 +1654,17 @@ class FLZ_AGS_Plugin
         echo $ui->form_end(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formularende.
 
         echo '<table class="widefat striped">';
-        echo '<thead><tr><th>Schüler*in</th><th>Klasse</th><th>AG</th><th>Slot</th><th>Kontakt</th><th>Status</th><th>Datum</th><th></th></tr></thead><tbody>';
+        echo '<thead><tr><th>Schüler*in</th><th>Klasse</th><th>AG</th><th>Slot</th><th>E-Mail Schüler*in</th><th>Status</th><th>Datum</th><th></th></tr></thead><tbody>';
         if (empty($registrations)) {
             echo '<tr><td colspan="8">Keine Anmeldungen gefunden.</td></tr>';
         }
         foreach ($registrations as $registration) {
             echo '<tr>';
             echo '<td>' . esc_html($registration->student_last_name . ', ' . $registration->student_first_name) . '</td>';
-            echo '<td>' . esc_html($registration->class_name) . '</td>';
+            echo '<td>' . esc_html(flz_ags_class_label((string) $registration->class_name)) . '</td>';
             echo '<td>' . esc_html($registration->title) . '</td>';
             echo '<td>' . esc_html(flz_ags_weekday_label($registration->weekday) . ', ' . flz_ags_format_time($registration->start_time) . '–' . flz_ags_format_time($registration->end_time) . ($registration->room ? ', ' . $registration->room : '')) . '</td>';
-            echo '<td>' . esc_html($registration->guardian_email) . '</td>';
+            echo '<td>' . esc_html($registration->student_email) . '</td>';
             echo '<td>' . esc_html(flz_ags_status_label($registration->status)) . '</td>';
             echo '<td>' . esc_html(flz_ui_format_datetime($registration->created_at, (string) $registration->created_at)) . '</td>';
             echo '<td>';
@@ -1365,7 +1687,7 @@ class FLZ_AGS_Plugin
         $new_status = isset($_POST['new_status']) ? sanitize_key(wp_unslash($_POST['new_status'])) : '';
 
         if ($registration_id <= 0 || !array_key_exists($new_status, flz_ags_status_labels())) {
-            wp_die('Ungültige Anfrage.');
+            wp_die(esc_html__('Ungültige Anfrage.', 'flz-ags'));
         }
 
         try {
@@ -1409,11 +1731,11 @@ class FLZ_AGS_Plugin
                 $csv_rows[] = array(
                     $row->school_year,
                     flz_ags_status_label($row->status),
-                    $row->class_name,
+                    flz_ags_class_label((string) $row->class_name),
                     $row->grade_key,
                     $row->student_last_name,
                     $row->student_first_name,
-                    $row->guardian_email,
+                    $row->student_email,
                     $row->title,
                     flz_ags_weekday_label($row->weekday),
                     flz_ags_format_time($row->start_time),
@@ -1423,7 +1745,7 @@ class FLZ_AGS_Plugin
                 );
             }
             $csv = flz_wpdb_objects_build_csv_string(
-                array('Schuljahr', 'Status', 'Klasse', 'Jahrgang', 'Nachname', 'Vorname', 'E-Mail', 'AG', 'Wochentag', 'Beginn', 'Ende', 'Raum', 'Anmeldedatum'),
+                array('Schuljahr', 'Status', 'Klasse', 'Jahrgangsschlüssel', 'Nachname', 'Vorname', 'E-Mail Schüler*in', 'AG', 'Wochentag', 'Beginn', 'Ende', 'Raum', 'Anmeldedatum'),
                 $csv_rows
             );
         } catch (Throwable $error) {

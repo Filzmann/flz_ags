@@ -6,33 +6,11 @@ defined('ABSPATH') || exit;
 // phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped
 
 /**
- * Liefert ausschließlich die manuell benannten Tabellen der Version 0.2.x.
- * Neue Abfragen verwenden immer die vom Modell abgeleiteten Tabellennamen.
- */
-function flz_ags_legacy_table(string $name): string
-{
-    global $wpdb;
-
-    if (!in_array($name, array('courses', 'slots', 'registrations'), true)) {
-        throw new InvalidArgumentException('Unbekannte alte AG-Tabelle: ' . $name);
-    }
-
-    return $wpdb->prefix . 'flz_ag_' . $name;
-}
-
-/**
  * Protokolliert technische Ursachen ohne sie an Besucher auszugeben.
  */
 function flz_ags_log_error(Throwable $error, string $context): void
 {
-    $messages = array();
-    $current = $error;
-    do {
-        $messages[] = get_class($current) . ': ' . $current->getMessage();
-        $current = $current->getPrevious();
-    } while ($current instanceof Throwable);
-
-    error_log('[flz_ags] ' . $context . ' | ' . implode(' <- ', $messages));
+    flz_wpdb_objects\FlzWpdbObjectsException::log_error($error, 'flz_ags', $context);
 }
 
 /**
@@ -43,6 +21,7 @@ function flz_ags_error_message(string $code): string
     $messages = array(
         'save-course' => 'Die AG konnte nicht vollständig gespeichert werden. Es wurden keine Teiländerungen übernommen.',
         'save-course-detail-page' => 'Die AG konnte nicht gespeichert werden: Für eine geöffnete Anmeldung muss eine gültige AG-Detailseite ausgewählt oder angelegt werden.',
+        'save-settings' => 'Die AG-Einstellungen konnten nicht gespeichert werden. Bitte die Angaben prüfen.',
         'install-demo' => 'Die Demo-AGs konnten nicht vollständig angelegt werden. Es wurden keine Teiländerungen übernommen.',
         'update-registration' => 'Die Anmeldung konnte nicht aktualisiert werden.',
         'export' => 'Der CSV-Export konnte nicht erstellt werden.',
@@ -97,15 +76,22 @@ function flz_ags_sanitize_school_year($value): string
 
 function flz_ags_default_classes(): array
 {
+    // Klassenliste für das Anmeldeformular: Schüler*innen wählen ihre echte
+    // Klasse. AG-Zielgruppen werden separat über flz_ags_default_grades()
+    // auf Jahrgänge reduziert.
     return array(
         '7.1', '7.2', '7.3', '7.4', '7.5',
         '8.1', '8.2', '8.3', '8.4', '8.5',
         '9.1', '9.2', '9.3', '9.4', '9.5', '9.6',
         '10.1', '10.2', '10.3', '10.4', '10.5',
-        'WKK1', 'WKK2',
         '11_BENK', '11_BLUM', '11_EDEL', '11_BEYE', '11_JOER', '11_KEYS', '11_KRUE', '11_MOES', '11_REIM', '11_WALT',
         '12_BERT', '12_BEST', '12_BEYE', '12_DITT', '12_DOLE', '12_GROS', '12_GUEN', '12_KELL', '12_BIRK', '12_MOHK', '12_TSCH',
     );
+}
+
+function flz_ags_default_grades(): array
+{
+    return array('7', '8', '9', '10', '11', '12');
 }
 
 function flz_ags_get_classes(): array
@@ -115,7 +101,13 @@ function flz_ags_get_classes(): array
         return flz_ags_default_classes();
     }
 
-    return array_values(array_filter(array_map('sanitize_text_field', $classes)));
+    $classes = flz_ags_normalize_classes($classes);
+
+    if (empty($classes) || flz_ags_classes_are_grade_only($classes)) {
+        return flz_ags_default_classes();
+    }
+
+    return $classes;
 }
 
 function flz_ags_sanitize_classes_from_text(string $text): array
@@ -124,24 +116,128 @@ function flz_ags_sanitize_classes_from_text(string $text): array
     $classes = array();
 
     foreach ((array) $lines as $line) {
-        $line = trim(sanitize_text_field($line));
+        $line = flz_ags_normalize_class_name(sanitize_text_field($line));
         if ($line !== '') {
             $classes[] = $line;
         }
     }
 
-    return array_values(array_unique($classes));
+    $classes = array_values(array_unique($classes));
+
+    return flz_ags_classes_are_grade_only($classes) ? flz_ags_default_classes() : $classes;
+}
+
+function flz_ags_normalize_classes(array $classes): array
+{
+    $normalized = array();
+
+    foreach ($classes as $class_name) {
+        $class_name = flz_ags_normalize_class_name((string) $class_name);
+        if ($class_name !== '') {
+            $normalized[] = $class_name;
+        }
+    }
+
+    return array_values(array_unique($normalized));
+}
+
+function flz_ags_classes_are_grade_only(array $classes): bool
+{
+    if (empty($classes)) {
+        return false;
+    }
+
+    foreach ($classes as $class_name) {
+        if (!in_array((string) $class_name, flz_ags_default_grades(), true)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function flz_ags_normalize_class_name(string $class_name): string
+{
+    $class_name = strtoupper(trim(str_replace("\xc2\xa0", ' ', $class_name)));
+    $class_name = preg_replace('/\s+/', '', $class_name) ?? $class_name;
+    $class_name = preg_replace('/^KLASSE/', '', $class_name) ?? $class_name;
+
+    if (preg_match('/^(7|8|9|10)\.(\d{1,2})$/', $class_name, $matches)) {
+        return $matches[1] . '.' . (int) $matches[2];
+    }
+
+    if (preg_match('/^(11|12)[._-]([A-ZÄÖÜ]{2,})$/u', $class_name, $matches)) {
+        return $matches[1] . '_' . $matches[2];
+    }
+
+    if (in_array($class_name, flz_ags_default_grades(), true)) {
+        return $class_name;
+    }
+
+    return '';
+}
+
+function flz_ags_class_label(string $class_name): string
+{
+    $class_name = flz_ags_normalize_class_name($class_name);
+
+    return $class_name;
+}
+
+function flz_ags_class_options(): array
+{
+    $options = array();
+
+    foreach (flz_ags_get_classes() as $class_name) {
+        $options[$class_name] = flz_ags_class_label($class_name);
+    }
+
+    return $options;
+}
+
+function flz_ags_allowed_grades_label(string $allowed_grades): string
+{
+    $allowed_grades = flz_ags_sanitize_allowed_grades($allowed_grades);
+    if ($allowed_grades === '') {
+        return 'alle Jahrgänge';
+    }
+
+    return implode(
+        ', ',
+        array_map(
+            'flz_ags_grade_label',
+            explode(',', $allowed_grades)
+        )
+    );
+}
+
+function flz_ags_grade_label(string $grade_key): string
+{
+    $grade_key = flz_ags_extract_grade_key($grade_key);
+
+    return $grade_key !== '' ? 'Klasse ' . $grade_key : '';
+}
+
+function flz_ags_grade_options(): array
+{
+    $options = array();
+
+    foreach (flz_ags_default_grades() as $grade_key) {
+        $options[$grade_key] = flz_ags_grade_label($grade_key);
+    }
+
+    return $options;
 }
 
 function flz_ags_extract_grade_key(string $class_name): string
 {
-    $class_name = trim($class_name);
+    $class_name = strtoupper(trim(str_replace("\xc2\xa0", ' ', $class_name)));
 
-    if (preg_match('/^WKK/i', $class_name)) {
-        return 'WKK';
+    if (preg_match('/(?:^|\b)KLASSE\s*(7|8|9|10|11|12)\b/', $class_name, $matches)) {
+        return $matches[1];
     }
 
-    if (preg_match('/^(\d{1,2})(?:[._]|$)/', $class_name, $matches)) {
+    if (preg_match('/^(7|8|9|10|11|12)(?=\D|$)/', $class_name, $matches)) {
         return (string) (int) $matches[1];
     }
 
@@ -150,7 +246,7 @@ function flz_ags_extract_grade_key(string $class_name): string
 
 function flz_ags_is_valid_class(string $class_name): bool
 {
-    return in_array($class_name, flz_ags_get_classes(), true);
+    return in_array(flz_ags_normalize_class_name($class_name), flz_ags_get_classes(), true);
 }
 
 function flz_ags_sanitize_allowed_grades($value): string
@@ -167,8 +263,9 @@ function flz_ags_sanitize_allowed_grades($value): string
         if ($item === '') {
             continue;
         }
-        if (in_array($item, array('7', '8', '9', '10', '11', '12', 'WKK'), true)) {
-            $allowed[] = $item;
+        $grade_key = flz_ags_extract_grade_key($item);
+        if (in_array($grade_key, flz_ags_default_grades(), true)) {
+            $allowed[] = $grade_key;
         }
     }
 
@@ -183,13 +280,13 @@ function flz_ags_grade_is_allowed(string $class_name, string $allowed_grades, bo
         return false;
     }
 
-    $allowed_grades = trim($allowed_grades);
+    $allowed_grades = flz_ags_sanitize_allowed_grades($allowed_grades);
     if ($allowed_grades === '') {
         return true;
     }
 
-    $allowed = array_map('trim', explode(',', strtoupper($allowed_grades)));
-    return in_array(strtoupper($grade_key), $allowed, true);
+    $allowed = array_map('trim', explode(',', $allowed_grades));
+    return in_array($grade_key, $allowed, true);
 }
 
 function flz_ags_weekdays(): array
@@ -295,9 +392,27 @@ function flz_ags_course_detail_url(object $course): string
 }
 
 /**
- * Sucht die Sammelseite „AGs“, unter der neue Detailseiten angelegt werden.
+ * Liefert die explizit eingestellte AG-Hauptseite.
  */
-function flz_ags_detail_parent_page_id(): int
+function flz_ags_configured_detail_parent_page_id(): int
+{
+    $page_id = absint(get_option('flz_ags_parent_page_id', 0));
+    if ($page_id <= 0) {
+        return 0;
+    }
+
+    $page = get_post($page_id);
+    if (!$page instanceof WP_Post || $page->post_type !== 'page' || in_array($page->post_status, array('trash', 'auto-draft'), true)) {
+        return 0;
+    }
+
+    return $page_id;
+}
+
+/**
+ * Sucht die Sammelseite „AGs“, falls noch keine Seite explizit eingestellt ist.
+ */
+function flz_ags_detect_detail_parent_page_id(): int
 {
     foreach (array('unser-angebot/ags', 'ags') as $path) {
         $page = get_page_by_path($path, OBJECT, 'page');
@@ -322,6 +437,19 @@ function flz_ags_detail_parent_page_id(): int
     }
 
     return 0;
+}
+
+/**
+ * Liefert die AG-Hauptseite, unter der Detailseiten angelegt und Demo-Seiten gelesen werden.
+ */
+function flz_ags_detail_parent_page_id(): int
+{
+    $configured_page_id = flz_ags_configured_detail_parent_page_id();
+    if ($configured_page_id > 0) {
+        return $configured_page_id;
+    }
+
+    return flz_ags_detect_detail_parent_page_id();
 }
 
 function flz_ags_page_status_label(string $status): string
@@ -518,7 +646,7 @@ function flz_ags_allowed_grades_from_demo_text(string $value): string
         }
     }
 
-    if (preg_match_all('/\b(?:7|8|9|10|11|12|WKK)\b/', $value, $matches)) {
+    if (preg_match_all('/\b(?:7|8|9|10|11|12)\b/', $value, $matches)) {
         $grades = array_merge($grades, $matches[0]);
     }
 

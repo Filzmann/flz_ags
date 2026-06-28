@@ -3,9 +3,12 @@
 
   function gradeKey(className) {
     className = (className || '').trim();
-    if (/^WKK/i.test(className)) return 'WKK';
-    var match = className.match(/^(\d{1,2})(?:[._]|$)/);
-    return match ? String(parseInt(match[1], 10)) : '';
+    var match = className.match(/(?:^|\b)klasse\s*(7|8|9|10|11|12)\b/i);
+
+    if (match) return match[1];
+
+    match = className.match(/^(7|8|9|10|11|12)(?=\D|$)/);
+    return match ? match[1] : '';
   }
 
   function includesValue(list, value) {

@@ -24,7 +24,9 @@
     $selected.empty();
 
     if (!page || !page.id) {
-      $('<strong>').text(pageString('noSelection', 'Keine Detailseite ausgewählt.')).appendTo($selected);
+      $('<strong>')
+        .text($field.attr('data-empty-label') || pageString('noSelection', 'Keine Detailseite ausgewählt.'))
+        .appendTo($selected);
       return;
     }
 

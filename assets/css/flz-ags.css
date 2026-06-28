@@ -27,13 +27,15 @@
 
 .flz-ags-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 22rem));
   gap: 1.25rem;
   align-items: stretch;
+  justify-content: start;
 }
 
 .flz-ags-card {
   min-height: 100%;
+  max-width: 22rem;
 }
 
 .flz-ags-badge,
@@ -54,6 +56,7 @@
 }
 
 .flz-ags-slot-fieldset {
+  max-width: 48rem;
   margin: 1.25rem 0;
   padding: 1rem;
   border: 1px solid currentColor;
@@ -68,10 +71,30 @@
   font-weight: 400;
 }
 
+.flz-ags-slot-fieldset .flz-ui-choice-card {
+  position: relative;
+  display: block;
+  max-width: 46rem;
+  margin: 0.75rem 0;
+}
+
+.flz-ags-slot-fieldset .flz-ui-choice-card__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .flz-ags-slot-fieldset .flz-ui-card--choice {
   display: grid;
-  grid-template-columns: minmax(96px, 140px) minmax(0, 1fr);
+  grid-template-columns: minmax(88px, 120px) minmax(0, 1fr);
   align-items: stretch;
+  min-height: 100%;
 }
 
 .flz-ags-slot-fieldset .flz-ui-card__image-wrap {
@@ -122,6 +145,45 @@
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: end;
+}
+
+.flz-ags-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  max-width: 980px;
+  margin-top: 1rem;
+}
+
+.flz-ags-settings-card {
+  padding: 1rem 1.25rem;
+  border: 1px solid #dcdcde;
+  border-radius: 0.45rem;
+  background: #fff;
+}
+
+.flz-ags-settings-card h2 {
+  margin-top: 0;
+}
+
+.flz-ags-settings-card .form-table {
+  margin-top: 0;
+}
+
+.flz-ags-settings-card .form-table th {
+  width: 220px;
+}
+
+.flz-ags-settings-summary {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-left: 4px solid #2271b1;
+  background: #f6f7f7;
+}
+
+.flz-ags-settings-help ul {
+  margin: 0.5rem 0 0 1.25rem;
+  list-style: disc;
 }
 
 .flz-ags-admin-thumb {
@@ -189,7 +251,99 @@
   color: #b32d2e;
 }
 
+.flz-ags-registration-panel .flz-ui-floating-panel__content .flz-ags-registration {
+  margin-top: 0;
+}
+
+.flz-ags-registration-panel .flz-ui-floating-panel__trigger {
+  right: auto;
+  bottom: clamp(5.25rem, 10vh, 7.5rem);
+  left: clamp(1rem, 3vw, 2rem);
+  min-width: min(20rem, calc(100vw - 2rem));
+  min-height: 3.7rem;
+  padding: 0.9rem 1.25rem;
+  border: 3px solid #111827;
+  border-radius: 999px;
+  background: #ffcc00;
+  color: #111827;
+  font-size: clamp(1.05rem, 1.3vw, 1.25rem);
+  font-weight: 850;
+  letter-spacing: 0.01em;
+  box-shadow:
+    0 0 0 0.35rem rgba(255, 204, 0, 0.35),
+    0 1rem 2.2rem rgba(0, 0, 0, 0.28);
+  transform-origin: left bottom;
+}
+
+.flz-ags-registration-panel .flz-ui-floating-panel__trigger:hover,
+.flz-ags-registration-panel .flz-ui-floating-panel__trigger:focus-visible {
+  border-color: #000;
+  background: #ffe066;
+  color: #000;
+  box-shadow:
+    0 0 0 0.45rem rgba(255, 204, 0, 0.5),
+    0 1.15rem 2.4rem rgba(0, 0, 0, 0.32);
+}
+
+.flz-ags-registration-panel .flz-ui-floating-panel__trigger::after {
+  content: "";
+  position: absolute;
+  inset: -0.65rem;
+  border: 3px solid rgba(255, 204, 0, 0.75);
+  border-radius: inherit;
+  animation: flz-ags-registration-pulse 1.8s ease-out infinite;
+  pointer-events: none;
+}
+
+.flz-ags-registration-panel.is-open .flz-ui-floating-panel__drawer,
+.flz-ags-registration-panel:target .flz-ui-floating-panel__drawer {
+  right: auto;
+  left: 0;
+  border-right: 1px solid var(--flz-ui-color-border);
+  border-left: 0;
+  box-shadow: 0.8rem 0 2rem rgba(0, 0, 0, 0.18);
+}
+
+@keyframes flz-ags-registration-pulse {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.96);
+  }
+
+  70% {
+    opacity: 0;
+    transform: scale(1.14);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.14);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flz-ags-registration-panel .flz-ui-floating-panel__trigger::after {
+    animation: none;
+  }
+}
+
 @media (max-width: 782px) {
+  .flz-ags {
+    margin: 1rem 0;
+  }
+
+  .flz-ags-grid,
+  .flz-ags-filters,
+  .flz-ags-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .flz-ags-card,
+  .flz-ags-slot-fieldset,
+  .flz-ags-slot-fieldset .flz-ui-choice-card {
+    max-width: none;
+  }
+
   .flz-ags-image-field {
     grid-template-columns: 1fr;
   }
@@ -205,6 +359,28 @@
 
   .flz-ags-slot-fieldset .flz-ui-card__image-wrap {
     max-height: 180px;
+  }
+
+  .flz-ags-slot-fieldset {
+    padding: 0.75rem;
+  }
+
+  .flz-ags-registration-panel .flz-ui-floating-panel__trigger {
+    right: 0.75rem;
+    bottom: max(4.75rem, env(safe-area-inset-bottom));
+    left: 0.75rem;
+    width: auto;
+    min-width: 0;
+    min-height: 3.9rem;
+    font-size: 1.08rem;
+  }
+
+  .flz-ags-registration-panel.is-open .flz-ui-floating-panel__drawer,
+  .flz-ags-registration-panel:target .flz-ui-floating-panel__drawer {
+    right: 0;
+    left: 0;
+    border-right: 0;
+    box-shadow: 0 -0.8rem 2rem rgba(0, 0, 0, 0.18);
   }
 
   .flz-ags-image-preview {
