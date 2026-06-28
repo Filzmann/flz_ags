@@ -1,6 +1,15 @@
-# FLZ AG-Verwaltung 0.3.9
+# FLZ AG-Verwaltung 0.3.10
 
 Initiale WordPress-Plugin-Version für AG-Verwaltung und AG-Anmeldung.
+
+## Neu in 0.3.10
+
+- Backend- und Frontend-Markup liegt in Templates unter `templates/`; die
+  Plugin-Klasse übernimmt nur noch Datenfluss, Validierung und Aktionen.
+- Admin-Tabellen, CSV-Export und Frontend-Karten nutzen die gemeinsamen
+  Komponenten aus `flz_ui_components`.
+- AG-Modelle verwenden die kontrollierten Custom-Query-Helper aus
+  `flz_wpdb_objects`; eigene SQL-Infrastruktur im Fachplugin entfällt.
 
 ## Neu in 0.3.9
 

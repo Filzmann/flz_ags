@@ -41,6 +41,39 @@ function flz_ags_safe_redirect(string $url): void
     exit;
 }
 
+/**
+ * Rendert ein AG-Template aus dem Pluginverzeichnis.
+ *
+ * Controller bereiten Daten vor; größere HTML-Blöcke bleiben in
+ * `templates/`, damit Backend-, Frontend- und Servicelogik lesbar bleiben.
+ *
+ * @param array<string,mixed> $vars Template-Variablen.
+ */
+function flz_ags_render_template(string $template, array $vars = array()): void
+{
+    $template = trim(str_replace(array('..', '\\'), '', $template), '/');
+    $file = FLZ_AGS_DIR . 'templates/' . $template . '.php';
+    if (!is_readable($file)) {
+        throw new RuntimeException('Das AG-Template "' . $template . '" wurde nicht gefunden.');
+    }
+
+    extract($vars, EXTR_SKIP);
+    include $file;
+}
+
+/**
+ * Rendert ein AG-Template als String.
+ *
+ * @param array<string,mixed> $vars Template-Variablen.
+ */
+function flz_ags_get_template(string $template, array $vars = array()): string
+{
+    ob_start();
+    flz_ags_render_template($template, $vars);
+
+    return (string) ob_get_clean();
+}
+
 function flz_ags_manage_capability(): string
 {
     return (string) apply_filters('flz_ags_manage_capability', 'manage_options');
