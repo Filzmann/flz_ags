@@ -1,11 +1,28 @@
-# Komponentenregeln: flz_ags
+# Regeln für flz_ags
 
-Zusätzlich gelten die Root-Regeln und die dortigen Skills
-`work-in-wordpress-extension` und `test-driven-wordpress-change`.
+Dieses Repository enthält ausschließlich das Fachplugin `flz_ags`. Es verwaltet
+AG-Angebote, Schuljahre, Slots und Anmeldungen. Personenbezogene Daten,
+Klassenlogik, Kapazität, CSV, E-Mail, Seitenanlage, Berechtigungen und
+Schemaänderungen sind Risikogrenzen.
 
-Dieses Fachplugin verwaltet AG-Angebote, Schuljahre, Slots und Anmeldungen.
-Klassenlogik, Kapazität, personenbezogene Daten, CSV-Export, Berechtigungen und
-Schemaänderungen sind Risikogrenzen. Gemeinsame Datenbank- und UI-Komponenten
-nur über öffentliche Verträge verwenden. Relevante Baseline:
-`./scripts/phpcs-flz-ags.sh` aus dem Root und `php tests/model-smoke.php`;
-WordPress-/Datenbank- und UI-Verhalten zusätzlich in DDEV prüfen.
+Harte Abhängigkeiten sind die öffentlichen, versionierten Verträge von
+`flz_wpdb_objects` und `flz_ui_components`. Der Header `Requires Plugins` wird
+durch defensive Klassen-/Funktions-/Versionsprüfungen ergänzt. Interne Dateien
+anderer Repositories werden nie direkt eingebunden.
+
+- Admin/AJAX prüfen engste Capability und Nonce; öffentliche Anmeldung prüft
+  Nonce, Objektbezug, Klasse, Slot, Duplikat und Kapazität serverseitig.
+- Kapazitäts- und Eindeutigkeitsprüfung samt Insert sind atomar.
+- Deaktivierung löscht keine Daten. Schema-Upgrades sind versioniert und
+  idempotent.
+- AGs/Slots und Anmeldungen besitzen jeweils versionierten CSV-Import und
+  -Export mit Dry-Run; Exporte werden geschützt direkt gestreamt.
+- Aufbewahrung, Auskunft, Anonymisierung und Löschung sind dokumentiert und
+  testbar. Logs und lokale Mail-Captures sind datensparsam und kurzlebig.
+- Übersetzbare Texte verwenden `flz-ags`.
+
+Beobachtbare Änderungen testgetrieben umsetzen. Sicherheitsgrenzen brauchen
+Allow-/Deny- und Parallelitätsfälle. Mindestens `php tests/model-smoke.php` und
+`./scripts/check-fast` ausführen; WordPress-/DDEV-/UI-Prüfung separat benennen.
+Keine Commits, Pushes, Aktivierungen, Seitenanlagen, Imports oder Deployments
+ohne ausdrückliche Freigabe; nie `git add .` verwenden.

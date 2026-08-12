@@ -1,0 +1,12 @@
+/vendor/
+/coverage/
+/.phpunit.result.cache
+/.idea/
+/.vscode/
+.DS_Store
+*.log
+*.tmp
+*.swp
+*~
+.env
+.env.*

@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<ruleset name="Tagore WordPress Plugin Security Baseline">
+	<description>Security-focused PHPCS rules for one Tagore WordPress plugin.</description>
+	<arg name="basepath" value="."/>
+	<arg name="extensions" value="php"/>
+	<arg name="parallel" value="4"/>
+	<file>.</file>
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/.git/*</exclude-pattern>
+	<rule ref="WordPress.Security.ValidatedSanitizedInput"/>
+	<rule ref="WordPress.Security.NonceVerification">
+		<exclude name="WordPress.Security.NonceVerification.Recommended"/>
+	</rule>
+	<rule ref="WordPress.Security.EscapeOutput"/>
+	<rule ref="WordPress.DB.PreparedSQL"/>
+</ruleset>
