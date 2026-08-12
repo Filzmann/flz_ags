@@ -26,8 +26,9 @@ Nebenläufigkeitsinvarianten und echte WordPress-/UI-Tests.
    Negativtest festlegen.
 5. Lokale Mock-Mails mit personenbezogenen Formularwerten nur kurzlebig und
    löschbar speichern; keine Übernahme in andere Umgebungen, Backups oder Logs.
-6. Direkte Includes aus Shared-Plugin-Verzeichnissen durch deren öffentliche
-   Bootstrap-/API-Verträge ersetzen; Provider- und Verbrauchertests koppeln.
+6. **Erledigt:** Direkte Includes aus Shared-Plugin-Verzeichnissen durch deren
+   öffentliche, versionierte Bootstrap-/API-Verträge ersetzt und mit einem
+   Verbraucher-Smoke abgesichert.
 
 ## P2
 

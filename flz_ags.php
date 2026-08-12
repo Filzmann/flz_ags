@@ -17,52 +17,52 @@ define('FLZ_AGS_URL', plugins_url('flz_ags/'));
 
 require_once FLZ_AGS_DIR . 'includes/helpers.php';
 
-$flz_ags_wpdb_objects_file = WP_PLUGIN_DIR . '/flz_wpdb_objects/FlzWpdbObject.php';
-if (!class_exists('flz_wpdb_objects\\FlzWpdbObject') && is_readable($flz_ags_wpdb_objects_file)) {
-    require_once $flz_ags_wpdb_objects_file;
+const FLZ_AGS_MIN_WPDB_OBJECTS_VERSION = '1.4.0';
+const FLZ_AGS_MIN_UI_COMPONENTS_VERSION = '0.1.11';
+
+function flz_ags_dependencies_available(): bool
+{
+    return defined('FLZ_WPDB_OBJECTS_VERSION')
+        && version_compare(FLZ_WPDB_OBJECTS_VERSION, FLZ_AGS_MIN_WPDB_OBJECTS_VERSION, '>=')
+        && class_exists('flz_wpdb_objects\\FlzWpdbObject')
+        && defined('FLZ_UI_COMPONENTS_VERSION')
+        && version_compare(FLZ_UI_COMPONENTS_VERSION, FLZ_AGS_MIN_UI_COMPONENTS_VERSION, '>=')
+        && function_exists('flz_ui');
 }
 
-if (!class_exists('flz_wpdb_objects\\FlzWpdbObject')) {
+function flz_ags_dependency_notice(): void
+{
     add_action('admin_notices', static function (): void {
         echo wp_kses_post(
             flz_ags_notice(
-                'FLZ AGs benötigt das aktive Plugin flz_wpdb_objects. Die AG-Verwaltung wurde nicht gestartet.',
+                'FLZ AGs benötigt aktuelle, aktive Versionen von flz_wpdb_objects und flz_ui_components. Die AG-Verwaltung wurde nicht gestartet.',
                 'error'
             )
         );
     });
-    return;
 }
 
-$flz_ags_ui_components_file = WP_PLUGIN_DIR . '/flz_ui_components/flz_ui_components.php';
-if (!function_exists('flz_ui') && is_readable($flz_ags_ui_components_file)) {
-    require_once $flz_ags_ui_components_file;
-}
+function flz_ags_bootstrap(): bool
+{
+    static $loaded = false;
 
-if (!function_exists('flz_ui')) {
-    add_action('admin_notices', static function (): void {
-        echo wp_kses_post(
-            flz_ags_notice(
-                'FLZ AGs benötigt das aktive Plugin flz_ui_components. Die AG-Verwaltung wurde nicht gestartet.',
-                'error'
-            )
-        );
-    });
-    return;
-}
+    if ($loaded) {
+        return true;
+    }
+    if (!flz_ags_dependencies_available()) {
+        flz_ags_dependency_notice();
+        return false;
+    }
 
-require_once FLZ_AGS_DIR . 'includes/models/class-flz-ags-model.php';
-require_once FLZ_AGS_DIR . 'includes/models/class-flz-ags-course.php';
-require_once FLZ_AGS_DIR . 'includes/models/class-flz-ags-slot.php';
-require_once FLZ_AGS_DIR . 'includes/models/class-flz-ags-registration.php';
-require_once FLZ_AGS_DIR . 'activate-deactivate.php';
-require_once FLZ_AGS_DIR . 'backend/backend.php';
-require_once FLZ_AGS_DIR . 'frontend/frontend.php';
-require_once FLZ_AGS_DIR . 'includes/class-flz-ags.php';
+    require_once FLZ_AGS_DIR . 'includes/models/class-flz-ags-model.php';
+    require_once FLZ_AGS_DIR . 'includes/models/class-flz-ags-course.php';
+    require_once FLZ_AGS_DIR . 'includes/models/class-flz-ags-slot.php';
+    require_once FLZ_AGS_DIR . 'includes/models/class-flz-ags-registration.php';
+    require_once FLZ_AGS_DIR . 'activate-deactivate.php';
+    require_once FLZ_AGS_DIR . 'backend/backend.php';
+    require_once FLZ_AGS_DIR . 'frontend/frontend.php';
+    require_once FLZ_AGS_DIR . 'includes/class-flz-ags.php';
 
-register_activation_hook(__FILE__, 'flz_ags_activate');
-
-add_action('plugins_loaded', static function () {
     try {
         flz_ags_maybe_upgrade();
     } catch (Throwable $error) {
@@ -75,7 +75,25 @@ add_action('plugins_loaded', static function () {
                 )
             );
         });
-        return;
+        return false;
     }
     FLZ_AGS_Plugin::instance();
-});
+    $loaded = true;
+
+    return true;
+}
+
+function flz_ags_activate_plugin(): void
+{
+    if (!flz_ags_bootstrap()) {
+        wp_die(esc_html__('Aktivierung abgebrochen: Erforderliche FLZ-Plugins fehlen oder sind zu alt.', 'flz-ags'));
+    }
+    flz_ags_activate();
+}
+
+register_activation_hook(__FILE__, 'flz_ags_activate_plugin');
+add_action('plugins_loaded', 'flz_ags_bootstrap', 20);
+
+if (did_action('plugins_loaded')) {
+    flz_ags_bootstrap();
+}
