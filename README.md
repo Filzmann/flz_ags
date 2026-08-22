@@ -1,6 +1,21 @@
-# FLZ AG-Verwaltung 0.5.0
+# FLZ AG-Verwaltung 0.6.0
 
 Initiale WordPress-Plugin-Version für AG-Verwaltung und AG-Anmeldung.
+
+## Neu in 0.6.0
+
+- Eine von der Plugin-Version getrennte DB-Version 2.0.0 führt den additiven,
+  idempotenten Upgradepfad für bestehende Registrierungen.
+- Ein datenschutzfreundlicher fachlicher Schlüssel und ein eindeutiger
+  Datenbankindex garantieren höchstens eine aktive Anmeldung pro
+  Schüler*in/Schuljahr – auch über verschiedene Slots hinweg.
+- WordPress-Privacy-Exporter und -Eraser liefern beziehungsweise löschen alle
+  Anmeldungen einer E-Mail-Adresse transaktional.
+- Die lokale Mail-Capture-Ausweichlösung speichert keine Empfänger-, Namens-,
+  Klassen-, Betreff- oder Nachrichtendaten mehr. Ein technischer Hinweis läuft
+  nach höchstens einer Stunde ab und kann im Backend sofort gelöscht werden.
+- Die lokale Bestandsmigration bewahrte 8 AGs, 10 Slots und 2 Anmeldungen; die
+  Deaktivierung änderte diese Daten nicht.
 
 ## Neu in 0.5.0
 
@@ -176,14 +191,13 @@ Initiale WordPress-Plugin-Version für AG-Verwaltung und AG-Anmeldung.
 - CSV-Exporte werden vor dem Senden vollständig geprüft. Führende
   Tabellenkalkulations-Formeln in Nutzwerten werden neutralisiert.
 
-### Einmaliger Migrationshinweis
+### Historischer Migrationshinweis
 
-Die Version ist noch nicht produktiv. Deshalb findet bewusst **keine
-Datenmigration** aus den bisherigen Tabellen `{prefix}flz_ag_courses`,
-`{prefix}flz_ag_slots` und `{prefix}flz_ag_registrations` statt. Der laufende
-Code kennt nur noch die modellabgeleiteten Tabellen. Falls lokale Altbestände
-aus Zwischenständen vorhanden sind, können sie in der nicht produktiven
-Entwicklungsumgebung gezielt manuell entfernt werden.
+Die alten Zwischenstandstabellen `{prefix}flz_ag_courses`,
+`{prefix}flz_ag_slots` und `{prefix}flz_ag_registrations` sind nicht Teil des
+aktuellen DB-2.0-Vertrags. Der Upgradepfad verändert oder löscht sie nicht. Der
+laufende Code verwendet ausschließlich die modellabgeleiteten Tabellen; eine
+spätere Bereinigung alter Zwischenstände benötigt eine gesonderte Freigabe.
 
 Die Shortcodes, Optionen und Administrations-URLs bleiben unverändert. Das
 Plugin setzt `flz_wpdb_objects` voraus; WordPress erhält diese Abhängigkeit

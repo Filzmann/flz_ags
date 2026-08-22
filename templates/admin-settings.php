@@ -155,3 +155,24 @@ $page_picker_row = static function (
     // phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
     ?>
 </section>
+
+<section class="flz-ags-settings-card">
+    <h2>Lokaler Mail-Fallback</h2>
+    <p>Falls die lokale Zustellung scheitert, wird höchstens eine Stunde lang nur ein technischer Versandnachweis ohne Empfänger, Namen, Klasse, Betreff oder Nachrichtentext gespeichert.</p>
+    <?php if ($mock_mail_capture_exists) : ?>
+        <?php
+        // phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped Formular, Nonce und Komponenten.
+        echo $ui->form_start(array(
+            'method' => 'post',
+            'action' => esc_url(admin_url('admin-post.php')),
+            'nonce' => 'flz_ags_clear_mock_mail_capture',
+            'hidden' => array('action' => 'flz_ags_clear_mock_mail_capture'),
+        )); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped Formular und Nonce.
+        echo $ui->button_delete(array('label' => 'Lokalen Versandnachweis jetzt löschen')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
+        echo $ui->form_end(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formularende.
+        // phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
+        ?>
+    <?php else : ?>
+        <p>Aktuell ist kein lokaler Versandnachweis gespeichert.</p>
+    <?php endif; ?>
+</section>

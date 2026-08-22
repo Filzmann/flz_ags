@@ -2,6 +2,20 @@
 
 defined('ABSPATH') || exit;
 
+function flz_ags_has_active_registration_conflict(Throwable $error): bool
+{
+    $current = $error;
+    do {
+        $message = strtolower($current->getMessage());
+        if (str_contains($message, 'active_student_key') || str_contains($message, 'duplicate entry')) {
+            return true;
+        }
+        $current = $current->getPrevious();
+    } while ($current instanceof Throwable);
+
+    return false;
+}
+
 // Exception-Texte sind interne Logdaten; HTML-Escaping erfolgt erst an der UI-Grenze.
 // phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped
 
@@ -28,6 +42,7 @@ class FLZ_AGS_Plugin
         add_action('admin_post_flz_ags_export_csv', array($this, 'handle_export_csv'));
         add_action('admin_post_flz_ags_import_registrations_csv', array($this, 'handle_import_registrations_csv'));
         add_action('admin_post_flz_ags_delete_old_registrations', array($this, 'handle_delete_old_registrations'));
+        add_action('admin_post_flz_ags_clear_mock_mail_capture', array($this, 'handle_clear_mock_mail_capture'));
         add_action('admin_post_flz_ags_export_courses_csv', array($this, 'handle_export_courses_csv'));
         add_action('admin_post_flz_ags_import_courses_csv', array($this, 'handle_import_courses_csv'));
         add_action('admin_post_flz_ags_install_demo', array($this, 'handle_install_demo'));
@@ -677,6 +692,7 @@ class FLZ_AGS_Plugin
             'parent_hint' => $parent_hint,
             'registration_retention_enabled' => (bool) get_option('flz_ags_registration_retention_enabled', 0),
             'registration_retention_months' => flz_ags_registration_retention_months(),
+            'mock_mail_capture_exists' => false !== get_transient('flz_ags_mock_confirmation_mail_last'),
         ));
         echo '</div>';
     }
@@ -716,6 +732,14 @@ class FLZ_AGS_Plugin
         }
 
         flz_ags_safe_redirect(flz_ags_admin_url(array('page' => 'flz-ags-settings', 'saved' => 1)));
+    }
+
+    public function handle_clear_mock_mail_capture(): void
+    {
+        $this->assert_admin_permission();
+        check_admin_referer('flz_ags_clear_mock_mail_capture');
+        delete_transient('flz_ags_mock_confirmation_mail_last');
+        flz_ags_safe_redirect(flz_ags_admin_url(array('page' => 'flz-ags-settings', 'mail_capture_cleared' => 1)));
     }
 
     public function render_admin_demo_page(): void
@@ -1064,24 +1088,11 @@ class FLZ_AGS_Plugin
             return false;
         }
 
-        $mails = get_option('flz_ags_mock_confirmation_mails', array());
-        if (!is_array($mails)) {
-            $mails = array();
-        }
-
-        $mails[] = array(
+        set_transient('flz_ags_mock_confirmation_mail_last', array(
             'created_at' => current_time('mysql'),
-            'to' => (string) $mail['to'],
-            'subject' => (string) $mail['subject'],
-            'message' => (string) $mail['message'],
             'course_id' => (int) $registration->course_id,
             'slot_id' => (int) $registration->slot_id,
-            'student' => trim((string) $registration->student_first_name . ' ' . (string) $registration->student_last_name),
-            'class_name' => flz_ags_class_label((string) $registration->class_name),
-            'course_title' => (string) $slot->title,
-        );
-
-        update_option('flz_ags_mock_confirmation_mails', array_slice($mails, -20), false);
+        ), HOUR_IN_SECONDS);
         return true;
     }
 
@@ -1279,6 +1290,12 @@ class FLZ_AGS_Plugin
             unset($result['registration'], $result['slot']);
             return $result;
         } catch (Throwable $error) {
+            if (flz_ags_has_active_registration_conflict($error)) {
+                return array(
+                    'success' => false,
+                    'messages' => array('Für diese Schüler*in existiert in diesem Schuljahr bereits eine aktive AG-Anmeldung. Änderungen bitte über die Schule veranlassen.'),
+                );
+            }
             flz_ags_log_error($error, 'Speichern einer öffentlichen AG-Anmeldung');
             return array(
                 'success' => false,

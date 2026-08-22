@@ -5,6 +5,27 @@ defined('ABSPATH') || exit;
 use flz_wpdb_objects\FlzWpdbObjectsException;
 
 /**
+ * Stabiler, nicht rückrechenbarer Schlüssel für eine Schüler*in pro Schuljahr.
+ */
+function flz_ags_registration_student_key(
+    string $school_year,
+    string $class_name,
+    string $first_name,
+    string $last_name
+): string {
+    $values = array($school_year, $class_name, $first_name, $last_name);
+    $values = array_map(
+        static function (string $value): string {
+            $value = preg_replace('/\s+/u', ' ', trim($value)) ?? trim($value);
+            return function_exists('mb_strtolower') ? mb_strtolower($value, 'UTF-8') : strtolower($value);
+        },
+        $values
+    );
+
+    return hash('sha256', implode('|', $values));
+}
+
+/**
  * Persistentes Modell einer AG-Anmeldung.
  */
 class FLZ_AGS_Registration extends FLZ_AGS_Model
@@ -23,6 +44,8 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
     public ?int $consent_privacy;
     public ?string $created_at;
     public ?string $updated_at;
+    public ?string $student_key;
+    public ?string $active_student_key;
 
     // Optionale Anzeige- und Exportfelder aus den JOIN-Abfragen.
     public ?string $title;
@@ -49,6 +72,8 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
         $this->consent_privacy = isset($data['consent_privacy']) ? (int) $data['consent_privacy'] : 0;
         $this->created_at = $data['created_at'] ?? null;
         $this->updated_at = $data['updated_at'] ?? null;
+        $this->student_key = $data['student_key'] ?? null;
+        $this->active_student_key = $data['active_student_key'] ?? null;
         $this->title = $data['title'] ?? null;
         $this->slug = $data['slug'] ?? null;
         $this->weekday = isset($data['weekday']) ? (int) $data['weekday'] : null;
@@ -137,12 +162,15 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
             consent_privacy tinyint(1) NOT NULL DEFAULT 0,
             created_at datetime NOT NULL,
             updated_at datetime NOT NULL,
+            student_key char(64) NOT NULL,
+            active_student_key char(64) NULL,
             PRIMARY KEY  (id),
             KEY slot_id (slot_id),
             KEY course_id (course_id),
             KEY school_year (school_year),
             KEY class_name (class_name),
-            KEY status (status)
+            KEY status (status),
+            UNIQUE KEY active_student_key (active_student_key)
         )";
     }
 
@@ -163,6 +191,14 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
             );
         }
 
+        $this->student_key = flz_ags_registration_student_key(
+            (string) $this->school_year,
+            (string) $this->class_name,
+            (string) $this->student_first_name,
+            (string) $this->student_last_name
+        );
+        $this->active_student_key = 'active' === $this->status ? $this->student_key : null;
+
         return array(
             'course_id' => $this->course_id,
             'slot_id' => $this->slot_id,
@@ -178,6 +214,14 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
             'consent_privacy' => $this->consent_privacy,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
+            'student_key' => $this->student_key,
+            'active_student_key' => $this->active_student_key,
         );
+    }
+
+    /** @return array<int,self> */
+    public static function find_by_email(string $email): array
+    {
+        return static::get_all_by(array('student_email' => sanitize_email($email)));
     }
 }
