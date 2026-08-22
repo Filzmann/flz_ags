@@ -14,6 +14,10 @@ Remote-Lauf, getrennte PHP-/JavaScript-No-Regression-Coverage, ausgefüllte
 Browser-/Mail-/Zwei-Prozess-Abnahme und ein reproduzierbar geprüftes
 Release-Artefakt. Das Protokoll liegt unter `docs/manual-acceptance.md`.
 
+Die lokal reproduzierte JavaScript-Line-Coverage beträgt 41,46 Prozent und ist
+als No-Regression-Ratsche konfiguriert; das Ziel bleibt 85 Prozent. Der
+PHPCOV-/Xdebug-Job ist vorbereitet, die PHP-Baseline wartet auf den Remote-Lauf.
+
 ## P1
 
 1. CSV-Roundtrip vervollständigen: **AGs einschließlich Slots und Anmeldungen

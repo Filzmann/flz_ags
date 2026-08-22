@@ -17,6 +17,11 @@ if compgen -G 'tests/*-smoke.php' >/dev/null; then
 	done
 fi
 
+echo
+echo "=== JavaScript tests ==="
+command -v node >/dev/null 2>&1 || { echo 'Node.js fehlt für die JavaScript-Tests.' >&2; exit 1; }
+node tests/run-js.mjs
+
 if [[ -x vendor/bin/phpcs ]]; then
 	echo
 	echo "=== PHPCS security baseline ==="

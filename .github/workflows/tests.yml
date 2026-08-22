@@ -69,3 +69,103 @@ jobs:
       - name: Komponentenprüfungen
         working-directory: flz_ags
         run: ./scripts/check-fast
+
+  coverage:
+    name: PHP-Coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Plugin auschecken
+        uses: actions/checkout@v7
+        with:
+          path: flz_ags
+      - name: flz_wpdb_objects-Referenz bestimmen
+        id: coverage-wpdb-ref
+        env:
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/Filzmann/flz_wpdb_objects.git "refs/heads/$CANDIDATE_REF" >/dev/null 2>&1; then
+            echo "ref=$CANDIDATE_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+      - name: flz_wpdb_objects auschecken
+        uses: actions/checkout@v7
+        with:
+          repository: Filzmann/flz_wpdb_objects
+          ref: ${{ steps.coverage-wpdb-ref.outputs.ref }}
+          path: flz_wpdb_objects
+      - name: Quality-Workspace-Referenz bestimmen
+        id: quality-ref
+        env:
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/Filzmann/tagore-plugins.git "refs/heads/$CANDIDATE_REF" >/dev/null 2>&1; then
+            echo "ref=$CANDIDATE_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Quality-Workspace auschecken
+        uses: actions/checkout@v7
+        with:
+          repository: Filzmann/tagore-plugins
+          ref: ${{ steps.quality-ref.outputs.ref }}
+          path: tagore-plugins
+      - name: PHP mit Xdebug einrichten
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: xdebug
+          extensions: mbstring
+          tools: composer:v2
+      - name: Gesperrte Coverage-Werkzeuge installieren
+        run: |
+          composer install --working-dir=flz_ags --no-interaction --no-progress --prefer-dist
+          composer install --working-dir=tagore-plugins/tests/coverage --no-interaction --no-progress --prefer-dist
+      - name: PHP-Line-Coverage messen
+        run: |
+          tagore-plugins/scripts/measure-component-php-coverage \
+            flz_ags \
+            flz_ags \
+            "$GITHUB_WORKSPACE/tagore-plugins/tests/coverage/vendor/bin/phpcov" \
+            "$RUNNER_TEMP/php-coverage"
+
+  javascript:
+    name: JavaScript-Coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Plugin auschecken
+        uses: actions/checkout@v7
+        with:
+          path: flz_ags
+      - name: Quality-Workspace-Referenz bestimmen
+        id: js-quality-ref
+        env:
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/Filzmann/tagore-plugins.git "refs/heads/$CANDIDATE_REF" >/dev/null 2>&1; then
+            echo "ref=$CANDIDATE_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Quality-Workspace auschecken
+        uses: actions/checkout@v7
+        with:
+          repository: Filzmann/tagore-plugins
+          ref: ${{ steps.js-quality-ref.outputs.ref }}
+          path: tagore-plugins
+      - name: Node.js einrichten
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Gesperrte JavaScript-Coverage-Werkzeuge installieren
+        run: npm ci --prefix tagore-plugins/tests/coverage --ignore-scripts
+      - name: JavaScript-Line-Coverage messen
+        run: |
+          tagore-plugins/scripts/measure-component-js-coverage \
+            flz_ags \
+            flz_ags \
+            "$GITHUB_WORKSPACE/tagore-plugins/tests/coverage/node_modules/.bin/c8" \
+            "$RUNNER_TEMP/js-coverage"

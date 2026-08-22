@@ -46,6 +46,9 @@ ohne ausdrückliche Freigabe; nie `git add .` verwenden.
   No-Regression-Baselines geprüft. Neuer oder wesentlich geänderter Code
   erreicht mindestens 85 Prozent; Sicherheits-, Datenschutz-, Migrations- und
   Nebenläufigkeitsinvarianten sind unabhängig davon vollständig abgedeckt.
+- Der PHPCOV-/Xdebug-Messjob ist vorbereitet; die PHP-Baseline bleibt bis zum
+  Remote-Lauf `pending`. Die lokal reproduzierte JavaScript-Baseline beträgt
+  41,46 Prozent und wird bereits als No-Regression-Ratsche geprüft.
 - Ein Fast- oder Diagnosecheck ist kein Releaseurteil. Ein Release braucht ein
   sauberes Repository, konsistente Version/Changelog/Lizenz, vollständig
   ausgefülltes `docs/manual-acceptance.md`, ein reproduzierbares Ein-Wurzel-
