@@ -2,6 +2,11 @@
 
 Initiale WordPress-Plugin-Version für AG-Verwaltung und AG-Anmeldung.
 
+Der BR-starke Commit-/Coverage-/Releasevertrag wird schrittweise übernommen;
+bis zum grünen lokalen Gate bleibt ein Release blockiert. Das ausfüllbare
+[Abnahmeprotokoll](docs/manual-acceptance.md) führt Installation, Upgrade,
+Nebenläufigkeit, CSV, Datenschutz, Mail, Oberfläche und Rückbau zusammen.
+
 ## Neu in 0.6.0
 
 - Eine von der Plugin-Version getrennte DB-Version 2.0.0 führt den additiven,

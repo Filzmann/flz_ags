@@ -2,13 +2,16 @@
 
 ## Prüfstatus
 
-**Release Candidate 0.6.0 / keine offenen P0- oder P1-Befunde.** Admin-/AJAX-
+**Funktionsstand 0.6.0 ohne offene P0-/P1-Befunde; Release-Gate in
+Übernahmephase 0 blockiert.** Admin-/AJAX-
 Pfade prüfen Capability und Nonce, CSV wird direkt gestreamt, Kapazität unter
 Slot-Sperre geprüft und aktive Mehrfachanmeldung durch einen eindeutigen
 Datenbankvertrag verhindert. Datenschutz, kurzlebige Mail-Capture-Diagnose und
 DB-Upgrade sind umgesetzt. Fast-Checks, reale lokale Bestandsmigration und
-Aktivieren–Deaktivieren–Aktivieren sind grün; Browser- und echte parallele
-Zwei-Prozess-Abnahmen bleiben Release-Nachweislücken.
+Aktivieren–Deaktivieren–Aktivieren sind grün. Vor einem Tag fehlen CI,
+getrennte PHP-/JavaScript-No-Regression-Coverage, ausgefüllte Browser-/Mail-/
+Zwei-Prozess-Abnahme und ein reproduzierbar geprüftes Release-Artefakt. Das
+Protokoll liegt unter `docs/manual-acceptance.md`.
 
 ## P1
 
