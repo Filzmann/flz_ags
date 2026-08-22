@@ -19,6 +19,7 @@ verwenden. Pro Fall genau ein Ergebnis markieren und Abweichungen begründen.
 
 | Nachweis | Kommando / Lauf | Ergebnis / Beleg |
 |---|---|---|
+| PR-/`main`-CI / PHP 8.1 und 8.5 | Workflow-Lauf / vollständiger Commit | |
 | Komponenten-, Security- und Migrations-Smokes | `./scripts/check-fast` | |
 | PHP-Line-Coverage / Baseline / Ziel 85 % | | |
 | JavaScript-Line-Coverage / Baseline / Ziel 85 % | | |

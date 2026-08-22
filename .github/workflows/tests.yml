@@ -1,0 +1,71 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php:
+    name: PHP ${{ matrix.php-version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['8.1', '8.5']
+    steps:
+      - name: Plugin auschecken
+        uses: actions/checkout@v7
+        with:
+          path: flz_ags
+      - name: flz_wpdb_objects-Referenz bestimmen
+        id: wpdb-ref
+        env:
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/Filzmann/flz_wpdb_objects.git "refs/heads/$CANDIDATE_REF" >/dev/null 2>&1; then
+            echo "ref=$CANDIDATE_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+      - name: flz_wpdb_objects auschecken
+        uses: actions/checkout@v7
+        with:
+          repository: Filzmann/flz_wpdb_objects
+          ref: ${{ steps.wpdb-ref.outputs.ref }}
+          path: flz_wpdb_objects
+      - name: flz_ui_components-Referenz bestimmen
+        id: ui-ref
+        env:
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/Filzmann/flz_ui_components.git "refs/heads/$CANDIDATE_REF" >/dev/null 2>&1; then
+            echo "ref=$CANDIDATE_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+      - name: flz_ui_components auschecken
+        uses: actions/checkout@v7
+        with:
+          repository: Filzmann/flz_ui_components
+          ref: ${{ steps.ui-ref.outputs.ref }}
+          path: flz_ui_components
+      - name: PHP einrichten
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          coverage: none
+          tools: composer:v2
+      - name: Gesperrte Entwicklungsabhängigkeiten installieren
+        run: composer install --working-dir=flz_ags --no-interaction --no-progress --prefer-dist
+      - name: Komponentenprüfungen
+        working-directory: flz_ags
+        run: ./scripts/check-fast
