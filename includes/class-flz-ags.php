@@ -657,13 +657,7 @@ class FLZ_AGS_Plugin
             );
         }
 
-        if ($save_and_close) {
-            $redirect_args = array('page' => 'flz-ags', 'saved' => 1);
-        } else {
-            $redirect_args = $save_and_new
-                ? array('page' => 'flz-ags', 'action' => 'new', 'saved' => 1)
-                : array('page' => 'flz-ags', 'action' => 'edit', 'course_id' => $course_id, 'saved' => 1);
-        }
+        $redirect_args = flz_ags_course_save_redirect_args($course_id, $save_and_new, $save_and_close);
 
         flz_ags_safe_redirect(flz_ags_admin_url($redirect_args));
     }

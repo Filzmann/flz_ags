@@ -83,6 +83,24 @@ function flz_ags_manage_capability(): string
     return (string) apply_filters('flz_ags_manage_capability', 'manage_options');
 }
 
+/**
+ * Bestimmt das Backendziel nach dem Speichern einer AG.
+ *
+ * Schließen hat Vorrang, falls ein manipulierter Request mehrere Aktionen
+ * gleichzeitig übermittelt.
+ */
+function flz_ags_course_save_redirect_args(int $course_id, bool $save_and_new, bool $save_and_close): array
+{
+    if ($save_and_close) {
+        return array('page' => 'flz-ags', 'saved' => 1);
+    }
+    if ($save_and_new) {
+        return array('page' => 'flz-ags', 'action' => 'new', 'saved' => 1);
+    }
+
+    return array('page' => 'flz-ags', 'action' => 'edit', 'course_id' => $course_id, 'saved' => 1);
+}
+
 function flz_ags_default_school_year(): string
 {
     return flz_ags_default_school_year_for_date(current_datetime());
