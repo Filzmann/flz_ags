@@ -528,6 +528,7 @@ class FLZ_AGS_Plugin
         $course_id = isset($_POST['course_id']) ? absint($_POST['course_id']) : 0;
         $title = isset($_POST['title']) ? sanitize_text_field(wp_unslash($_POST['title'])) : '';
         $save_and_new = isset($_POST['save_and_new']);
+        $save_and_close = isset($_POST['save_and_close']);
 
         if ($title === '') {
             wp_die(esc_html__('Der Titel ist erforderlich.', 'flz-ags'));
@@ -656,9 +657,13 @@ class FLZ_AGS_Plugin
             );
         }
 
-        $redirect_args = $save_and_new
-            ? array('page' => 'flz-ags', 'action' => 'new', 'saved' => 1)
-            : array('page' => 'flz-ags', 'action' => 'edit', 'course_id' => $course_id, 'saved' => 1);
+        if ($save_and_close) {
+            $redirect_args = array('page' => 'flz-ags', 'saved' => 1);
+        } else {
+            $redirect_args = $save_and_new
+                ? array('page' => 'flz-ags', 'action' => 'new', 'saved' => 1)
+                : array('page' => 'flz-ags', 'action' => 'edit', 'course_id' => $course_id, 'saved' => 1);
+        }
 
         flz_ags_safe_redirect(flz_ags_admin_url($redirect_args));
     }

@@ -33,14 +33,38 @@ $checks = array(
 		'Der „Speichern und neu“-Button verwendet nicht das kombinierte Disketten-/Plus-Icon als Submit.',
 	),
 	array(
+		str_contains( $template_source, "'label' => 'Speichern und schließen'" )
+		&& str_contains( $template_source, "\$ui->button_save(array('label' => 'Speichern und schließen', 'class' => 'flz-ags-save-and-close', 'type' => 'submit'" )
+		&& str_contains( $style_source, '.flz-ags-save-and-close::after' )
+		&& str_contains( $style_source, 'content: "×";' )
+		&& str_contains( $template_source, "'name' => 'save_and_close'" ),
+		'Der „Speichern und schließen“-Button verwendet nicht sein kombiniertes Disketten-/Schließen-Icon als Submit.',
+	),
+	array(
 		str_contains( $save_handler_source, "isset(\$_POST['save_and_new'])" ),
 		'Der Speichervorgang wertet „Speichern und neu“ nicht aus.',
+	),
+	array(
+		str_contains( $save_handler_source, "isset(\$_POST['save_and_close'])" ),
+		'Der Speichervorgang wertet „Speichern und schließen“ nicht aus.',
+	),
+	array(
+		strpos( $save_handler_source, '$this->assert_admin_permission();' )
+		< strpos( $save_handler_source, "isset(\$_POST['save_and_close'])" )
+		&& strpos( $save_handler_source, "check_admin_referer('flz_ags_save_course');" )
+		< strpos( $save_handler_source, "isset(\$_POST['save_and_close'])" ),
+		'Die neue Speicheraktion wird ausgewertet, bevor Capability und Nonce geprüft wurden.',
 	),
 	array(
 		str_contains( $save_handler_source, '$redirect_args = $save_and_new' )
 		&& str_contains( $save_handler_source, "? array('page' => 'flz-ags', 'action' => 'new', 'saved' => 1)" )
 		&& str_contains( $save_handler_source, ": array('page' => 'flz-ags', 'action' => 'edit', 'course_id' => \$course_id, 'saved' => 1)" ),
 		'Der Speichervorgang unterscheidet die Zielseiten für „neu“ und „bearbeiten“ nicht.',
+	),
+	array(
+		str_contains( $save_handler_source, 'if ($save_and_close)' )
+		&& str_contains( $save_handler_source, "array('page' => 'flz-ags', 'saved' => 1)" ),
+		'Der Speichervorgang leitet nach „Speichern und schließen“ nicht zur AG-Liste weiter.',
 	),
 	array(
 		! str_contains( $save_handler_source, '$registration_open && $detail_page_id <= 0' ),

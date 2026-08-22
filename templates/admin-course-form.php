@@ -181,6 +181,7 @@ if (empty($slot_rows)) {
 	?>
 	<p>
 		<?php echo $ui->button_save(array('label' => 'AG speichern')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+		<?php echo $ui->button_save(array('label' => 'Speichern und schließen', 'class' => 'flz-ags-save-and-close', 'type' => 'submit', 'attrs' => array('name' => 'save_and_close', 'value' => '1'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
 		<?php echo $ui->button_save(array('label' => 'Speichern und neu', 'class' => 'flz-ags-save-and-new', 'type' => 'submit', 'attrs' => array('name' => 'save_and_new', 'value' => '1'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
 	</p>
 <?php echo $ui->form_end(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formularende. ?>

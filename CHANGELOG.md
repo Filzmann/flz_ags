@@ -5,6 +5,8 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 
 ## Unreleased
 
+- Backend-Aktion „Speichern und schließen“ mit eigenem kombiniertem Icon und
+  Rückkehr zur AG-Liste ergänzt.
 - Reproduzierbare PR-/Main-CI für PHP 8.1 und 8.5 ergänzt.
 - Branchgleicher Checkout beider Shared-Plugins mit sicherem `main`-Fallback
   ergänzt.
