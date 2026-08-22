@@ -1,6 +1,8 @@
 (function () {
   'use strict';
 
+  var activeRegistrationPanel = null;
+
   function gradeKey(className) {
     className = (className || '').trim();
     var match = className.match(/(?:^|\b)klasse\s*(7|8|9|10|11|12)\b/i);
@@ -58,6 +60,80 @@
     });
   }
 
+  function setRegistrationPanelSemantics(panel, active) {
+    var drawer;
+
+    if (!panel) return;
+
+    drawer = panel.querySelector('.flz-ui-floating-panel__drawer');
+    if (!drawer) return;
+
+    if (active) {
+      drawer.setAttribute('role', 'dialog');
+      drawer.setAttribute('aria-modal', 'true');
+    } else {
+      drawer.setAttribute('role', 'region');
+      drawer.removeAttribute('aria-modal');
+    }
+  }
+
+  function clearRegistrationModalBackground() {
+    document.querySelectorAll('[data-flz-ags-modal-inert]').forEach(function (element) {
+      element.inert = false;
+      element.removeAttribute('data-flz-ags-modal-inert');
+    });
+  }
+
+  function makeRegistrationModalBackgroundInert(panel) {
+    var current = panel;
+    var parent;
+
+    while (current && current.parentElement) {
+      parent = current.parentElement;
+      Array.prototype.forEach.call(parent.children, function (sibling) {
+        if (sibling === current || sibling.inert) return;
+
+        sibling.inert = true;
+        sibling.setAttribute('data-flz-ags-modal-inert', 'true');
+      });
+
+      if (parent === document.body) break;
+      current = parent;
+    }
+  }
+
+  function closeCompetingRegistrationPanel(panel) {
+    var trigger;
+
+    panel.classList.remove('is-open');
+    trigger = panel.querySelector('[data-flz-ui-floating-panel-open]');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    setRegistrationPanelSemantics(panel, false);
+  }
+
+  function syncRegistrationModalState() {
+    var openPanels = Array.prototype.slice.call(document.querySelectorAll('.flz-ags-registration-panel.is-open'));
+
+    if (activeRegistrationPanel && openPanels.indexOf(activeRegistrationPanel) === -1) {
+      setRegistrationPanelSemantics(activeRegistrationPanel, false);
+      activeRegistrationPanel = null;
+    }
+
+    if (!activeRegistrationPanel && openPanels.length > 0) {
+      activeRegistrationPanel = openPanels[0];
+    }
+
+    openPanels.forEach(function (panel) {
+      if (panel !== activeRegistrationPanel) closeCompetingRegistrationPanel(panel);
+    });
+
+    clearRegistrationModalBackground();
+    if (!activeRegistrationPanel) return;
+
+    setRegistrationPanelSemantics(activeRegistrationPanel, true);
+    makeRegistrationModalBackgroundInert(activeRegistrationPanel);
+  }
+
   function initScope(scope) {
     var classSelects = scope.querySelectorAll('[data-flz-ags-class-select]');
     var weekdaySelects = scope.querySelectorAll('[data-flz-ags-weekday-select]');
@@ -74,5 +150,11 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.flz-ags').forEach(initScope);
+    syncRegistrationModalState();
+  });
+
+  document.addEventListener('click', syncRegistrationModalState);
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') syncRegistrationModalState();
   });
 }());

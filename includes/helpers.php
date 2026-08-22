@@ -21,6 +21,7 @@ function flz_ags_error_message(string $code): string
     $messages = array(
         'save-course' => 'Die AG konnte nicht vollständig gespeichert werden. Es wurden keine Teiländerungen übernommen.',
         'save-course-detail-page' => 'Die AG konnte nicht gespeichert werden: Für eine geöffnete Anmeldung muss eine gültige AG-Detailseite ausgewählt oder angelegt werden.',
+        'quick-edit-course' => 'Die AG konnte nicht per Schnellbearbeitung gespeichert werden.',
         'save-settings' => 'Die AG-Einstellungen konnten nicht gespeichert werden. Bitte die Angaben prüfen.',
         'install-demo' => 'Die Demo-AGs konnten nicht vollständig angelegt werden. Es wurden keine Teiländerungen übernommen.',
         'update-registration' => 'Die Anmeldung konnte nicht aktualisiert werden.',

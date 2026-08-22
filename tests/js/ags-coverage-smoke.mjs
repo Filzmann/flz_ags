@@ -60,6 +60,114 @@ weekdaySelect.value = '';
 weekdaySelect.listeners.change();
 assert.equal(items[2].hidden, false);
 
+const modalListeners = new Map();
+const makeClassList = (...classes) => {
+  const values = new Set(classes);
+  return {
+    add(...names) { names.forEach((name) => values.add(name)); },
+    remove(...names) { names.forEach((name) => values.delete(name)); },
+    contains(name) { return values.has(name); },
+    toggle(name, force) {
+      if (force === false) values.delete(name);
+      else if (force === true || !values.has(name)) values.add(name);
+      else values.delete(name);
+    }
+  };
+};
+const makeNode = (...classes) => ({
+  children: [],
+  parentElement: null,
+  classList: makeClassList(...classes),
+  attributes: {},
+  inert: false,
+  append(...nodes) {
+    nodes.forEach((node) => {
+      node.parentElement = this;
+      this.children.push(node);
+    });
+  },
+  setAttribute(name, value) { this.attributes[name] = String(value); },
+  getAttribute(name) { return this.attributes[name] ?? null; },
+  removeAttribute(name) { delete this.attributes[name]; },
+  querySelector() { return null; }
+});
+const modalBody = makeNode('body');
+const modalBackground = makeNode('site-header');
+const modalPage = makeNode('site-main');
+const modalListHeader = makeNode('flz-ags-list-header');
+const modalGrid = makeNode('flz-ags-grid');
+const modalEntryOne = makeNode('flz-ags-course-entry');
+const modalCardOne = makeNode('flz-ags-card');
+const modalPanelOne = makeNode('flz-ui-floating-panel', 'flz-ags-registration-panel');
+const modalTriggerOne = makeNode('flz-ui-floating-panel__trigger');
+const modalDrawerOne = makeNode('flz-ui-floating-panel__drawer');
+const modalEntryTwo = makeNode('flz-ags-course-entry');
+const modalCardTwo = makeNode('flz-ags-card');
+const modalPanelTwo = makeNode('flz-ui-floating-panel', 'flz-ags-registration-panel');
+const modalTriggerTwo = makeNode('flz-ui-floating-panel__trigger');
+const modalDrawerTwo = makeNode('flz-ui-floating-panel__drawer');
+modalPanelOne.querySelector = (selector) => selector === '[data-flz-ui-floating-panel-open]' ? modalTriggerOne : (selector === '.flz-ui-floating-panel__drawer' ? modalDrawerOne : null);
+modalPanelTwo.querySelector = (selector) => selector === '[data-flz-ui-floating-panel-open]' ? modalTriggerTwo : (selector === '.flz-ui-floating-panel__drawer' ? modalDrawerTwo : null);
+modalTriggerOne.closest = () => modalPanelOne;
+modalTriggerTwo.closest = () => modalPanelTwo;
+modalPanelOne.append(modalTriggerOne, modalDrawerOne);
+modalPanelTwo.append(modalTriggerTwo, modalDrawerTwo);
+modalEntryOne.append(modalCardOne, modalPanelOne);
+modalEntryTwo.append(modalCardTwo, modalPanelTwo);
+modalGrid.append(modalEntryOne, modalEntryTwo);
+modalPage.append(modalListHeader, modalGrid);
+modalBody.append(modalBackground, modalPage);
+
+const modalPanels = [modalPanelOne, modalPanelTwo];
+const modalDocument = {
+  body: modalBody,
+  addEventListener(type, handler) {
+    const handlers = modalListeners.get(type) || [];
+    handlers.push(handler);
+    modalListeners.set(type, handlers);
+  },
+  querySelectorAll(selector) {
+    if (selector === '.flz-ags') return [];
+    if (selector === '.flz-ags-registration-panel.is-open') return modalPanels.filter((panel) => panel.classList.contains('is-open'));
+    if (selector === '[data-flz-ags-modal-inert]') {
+      const result = [];
+      const visit = (node) => {
+        if (node.getAttribute('data-flz-ags-modal-inert') !== null) result.push(node);
+        node.children.forEach(visit);
+      };
+      visit(modalBody);
+      return result;
+    }
+    return [];
+  }
+};
+const modalWindow = {setTimeout(handler) { handler(); }};
+const modalContext = vm.createContext({document: modalDocument, window: modalWindow, console, String});
+vm.runInContext(fs.readFileSync(frontendFile, 'utf8'), modalContext, {filename: frontendFile});
+modalListeners.get('DOMContentLoaded').forEach((handler) => handler());
+
+modalPanelOne.classList.add('is-open');
+modalListeners.get('click').forEach((handler) => handler({target: modalTriggerOne}));
+assert.equal(modalBackground.inert, true);
+assert.equal(modalListHeader.inert, true);
+assert.equal(modalCardOne.inert, true);
+assert.equal(modalEntryTwo.inert, true);
+assert.equal(modalPanelOne.inert, false);
+assert.equal(modalDrawerOne.getAttribute('role'), 'dialog');
+assert.equal(modalDrawerOne.getAttribute('aria-modal'), 'true');
+
+modalPanelTwo.classList.add('is-open');
+modalListeners.get('click').forEach((handler) => handler({target: modalTriggerTwo}));
+assert.equal(modalPanelOne.classList.contains('is-open'), true);
+assert.equal(modalPanelTwo.classList.contains('is-open'), false);
+assert.equal(modalTriggerTwo.getAttribute('aria-expanded'), 'false');
+
+modalPanelOne.classList.remove('is-open');
+modalListeners.get('keydown').forEach((handler) => handler({key: 'Escape'}));
+assert.equal(modalBackground.inert, false);
+assert.equal(modalEntryTwo.inert, false);
+assert.equal(modalDrawerOne.getAttribute('aria-modal'), null);
+
 class Wrapper {
   constructor(subject = {}) {
     this.subject = subject;

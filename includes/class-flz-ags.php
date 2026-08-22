@@ -37,6 +37,7 @@ class FLZ_AGS_Plugin
     {
         add_action('admin_menu', array($this, 'register_admin_menu'));
         add_action('admin_post_flz_ags_save_course', array($this, 'handle_save_course'));
+        add_action('admin_post_flz_ags_quick_edit_course', array($this, 'handle_quick_edit_course'));
         add_action('admin_post_flz_ags_save_settings', array($this, 'handle_save_settings'));
         add_action('admin_post_flz_ags_update_registration', array($this, 'handle_update_registration'));
         add_action('admin_post_flz_ags_export_csv', array($this, 'handle_export_csv'));
@@ -335,6 +336,9 @@ class FLZ_AGS_Plugin
 
         if (isset($_GET['saved'])) {
             echo wp_kses_post(flz_ags_notice('AG gespeichert.'));
+        }
+        if (isset($_GET['quick_saved'])) {
+            echo wp_kses_post(flz_ags_notice('AG per Schnellbearbeitung gespeichert.'));
         }
         if (isset($_GET['demo'])) {
             $count = absint($_GET['demo']);
@@ -660,6 +664,66 @@ class FLZ_AGS_Plugin
         $redirect_args = flz_ags_course_save_redirect_args($course_id, $save_and_new, $save_and_close);
 
         flz_ags_safe_redirect(flz_ags_admin_url($redirect_args));
+    }
+
+    /**
+     * Speichert die bewusst begrenzte Feldauswahl der AG-Listenzeile.
+     */
+    public function handle_quick_edit_course(): void
+    {
+        $this->assert_admin_permission();
+
+        $course_id = isset($_POST['course_id']) ? absint(wp_unslash($_POST['course_id'])) : 0;
+        check_admin_referer('flz_ags_quick_edit_course_' . $course_id);
+
+        $school_year = isset($_POST['school_year_return'])
+            ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_POST['school_year_return'])))
+            : flz_ags_current_school_year();
+
+        try {
+            $course = $course_id > 0 ? FLZ_AGS_Course::get_by_id($course_id) : null;
+            if (!$course instanceof FLZ_AGS_Course) {
+                throw new UnexpectedValueException('Die zu aktualisierende AG wurde nicht gefunden.');
+            }
+
+            $title = isset($_POST['title']) ? sanitize_text_field(wp_unslash($_POST['title'])) : '';
+            if ($title === '') {
+                throw new UnexpectedValueException('Der Titel ist erforderlich.');
+            }
+
+            $course->title = $title;
+            $course->slug = sanitize_title($title);
+            $course->short_description = isset($_POST['short_description']) ? sanitize_textarea_field(wp_unslash($_POST['short_description'])) : '';
+            $course->category = isset($_POST['category']) ? sanitize_text_field(wp_unslash($_POST['category'])) : '';
+            $course->leader_name = isset($_POST['leader_name']) ? sanitize_text_field(wp_unslash($_POST['leader_name'])) : '';
+            $course->allowed_grades = isset($_POST['allowed_grades'])
+                ? flz_ags_sanitize_allowed_grades(sanitize_text_field(wp_unslash($_POST['allowed_grades'])))
+                : '';
+            $course->only_grade_7 = isset($_POST['only_grade_7']) ? 1 : 0;
+            $course->is_active = isset($_POST['is_active']) ? 1 : 0;
+            $course->is_visible = isset($_POST['is_visible']) ? 1 : 0;
+            $registration_open = isset($_POST['registration_open']) ? 1 : 0;
+            if ($registration_open && (int) $course->detail_page_id > 0 && get_post_status((int) $course->detail_page_id) !== 'publish') {
+                throw new UnexpectedValueException('Für eine geöffnete AG-Anmeldung muss die Detailseite veröffentlicht sein.');
+            }
+            $course->registration_open = $registration_open;
+            $course->sort_order = isset($_POST['sort_order']) ? intval(wp_unslash($_POST['sort_order'])) : 0;
+            $course->updated_at = current_time('mysql');
+            $course->save();
+        } catch (Throwable $error) {
+            $this->redirect_admin_error(
+                $error,
+                'Schnellbearbeitung einer AG',
+                'quick-edit-course',
+                array('page' => 'flz-ags', 'school_year' => $school_year)
+            );
+        }
+
+        flz_ags_safe_redirect(flz_ags_admin_url(array(
+            'page' => 'flz-ags',
+            'school_year' => $school_year,
+            'quick_saved' => 1,
+        )));
     }
 
     public function render_admin_settings_page(): void
