@@ -29,7 +29,7 @@ final class FLZ_AGS_Course {
 	}
 }
 
-$registered_blocks = array();
+$GLOBALS['registered_blocks'] = array();
 function flz_ui_register_shortcode_block( array $config ): void {
 	$GLOBALS['registered_blocks'][] = $config;
 }
@@ -82,8 +82,8 @@ flz_ags_block_year_assert(
 
 $plugin = ( new ReflectionClass( FLZ_AGS_Plugin::class ) )->newInstanceWithoutConstructor();
 $plugin->register_blocks();
-flz_ags_block_year_assert( 2 === count( $registered_blocks ), 'Die beiden AG-Shortcode-Blöcke wurden nicht registriert.' );
-foreach ( $registered_blocks as $block ) {
+flz_ags_block_year_assert( 2 === count( $GLOBALS['registered_blocks'] ), 'Die beiden AG-Shortcode-Blöcke wurden nicht registriert.' );
+foreach ( $GLOBALS['registered_blocks'] as $block ) {
 	$field = $block['fields']['school_year'] ?? array();
 	flz_ags_block_year_assert(
 		'select' === ( $field['control'] ?? '' ) && $selection['options'] === ( $field['options'] ?? array() ),
