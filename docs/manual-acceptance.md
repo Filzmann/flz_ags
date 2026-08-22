@@ -28,6 +28,18 @@ verwenden. Pro Fall genau ein Ergebnis markieren und Abweichungen begründen.
 
 ## Manuelle Prüffälle
 
+### Technischer ZIP-Teilnachweis vom 22. August 2026
+
+- Umgebung: DDEV, WordPress 7.1, PHP 8.3, MariaDB 10.11.
+- Exaktes Artefakt: `flz_ags-0.6.0.zip`, Commit
+  `78ea41b5351794df06709065836329165a4de5bd`, SHA-256
+  `ca14e1e0d8849e594488ff7c41fe343d6a972fc8f0e96f2c9f5aeaee9ac7877a`.
+- Reproduzierbarkeit, Archivvertrag und installierter Dateibaum sowie
+  WP-CLI-Installation, Aktivstatus, Deaktivierung, Reaktivierung und HTTP 200
+  waren erfolgreich. Snapshot- und Symlink-Rückbau waren erfolgreich.
+- Noch nicht belegt: saubere Frischinstallation, Upgrade aus der relevanten
+  Vorversion mit synthetischem Bestand sowie AG-03 bis AG-09.
+
 | ID | Prüfschritte | Erwartetes Ergebnis | Ergebnis | Warum / Beleg / Abweichung |
 |---|---|---|---|---|
 | AG-01 | Frischinstallation und Upgrade aus der relevanten Vorversion mit synthetischem Bestand durchführen. | DB-Version 2.0.0 und eindeutiger aktiver Schlüssel sind vollständig; Wiederholung ist idempotent. | [ ] erfolgreich [ ] nicht erfolgreich [ ] nicht geprüft | |
