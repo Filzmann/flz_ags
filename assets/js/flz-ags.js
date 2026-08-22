@@ -44,10 +44,12 @@
     var items = scope.querySelectorAll('[data-flz-ags-filter-item]');
 
     items.forEach(function (item) {
+      if (item.closest('.flz-ags') !== scope) return;
+
       var show = isAllowed(item, selectedClass, weekday);
       item.hidden = !show;
 
-      var input = item.querySelector('input[type="radio"]');
+      var input = item.getAttribute('data-weekday') ? item.querySelector('input[type="radio"]') : null;
       if (input) {
         var isFull = item.getAttribute('data-full') === '1';
         input.disabled = !show || isFull;

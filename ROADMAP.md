@@ -11,12 +11,16 @@ Nebenläufigkeitsinvarianten und echte WordPress-/UI-Tests.
 
 ## P1
 
-1. CSV-Import und -Export als versionierten Roundtrip-Vertrag ergänzen: AGs
-   einschließlich Slots sowie Anmeldungen jeweils mit Dry-Run, Referenz-,
-   Duplikat-, Kapazitäts- und Rollbacktests. Exporte direkt streamen.
-2. Aufbewahrungs-, Auskunfts-, Widerrufs-, Anonymisierungs- und Löschvertrag für
-   Schülerdaten definieren; WordPress-Privacy-Exporter/-Eraser und eine
-   idempotente schuljahrbezogene Löschroutine ergänzen.
+1. CSV-Roundtrip vervollständigen: **AGs einschließlich Slots und Anmeldungen
+   erledigt** mit
+   versioniertem Direktdownload, fehlertolerantem Direktimport, aussagekräftigem
+   Importbericht, optionalem Slot-Export, wählbarer Schuljahrübernahme sowie
+   transaktionaler Übernahme. Für den Anmeldungs-Restore bleiben echte
+   WordPress-Integrations- und Rollbacktests offen.
+2. **Teilweise erledigt:** Konfigurierbare Aufbewahrungsfrist, standardmäßig
+   deaktivierte tägliche Löschung und bestätigte manuelle Löschung basieren auf
+   dem ursprünglichen Anmeldedatum. Auskunft, Anonymisierung sowie
+   WordPress-Privacy-Exporter/-Eraser bleiben offen.
 3. DB-Schemaversion von der allgemeinen Plugin-Version trennen. Jede Änderung
    als benannten, additiven Upgradepfad mit Frischinstallations-, Upgrade-,
    Wiederholungs- und synthetischem Bestandsdatentest ausführen.
@@ -29,6 +33,9 @@ Nebenläufigkeitsinvarianten und echte WordPress-/UI-Tests.
 6. **Erledigt:** Direkte Includes aus Shared-Plugin-Verzeichnissen durch deren
    öffentliche, versionierte Bootstrap-/API-Verträge ersetzt und mit einem
    Verbraucher-Smoke abgesichert.
+7. **Erledigt:** Neue Demo-AGs übernehmen keine Titel, Freitexte,
+   Leitungsnamen oder Bilder aus veröffentlichten Seiten. Ein Privacy-Smoke
+   sichert die synthetischen Felder; bestehende Datensätze bleiben unangetastet.
 
 ## P2
 

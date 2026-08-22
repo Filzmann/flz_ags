@@ -25,6 +25,10 @@ function flz_ags_error_message(string $code): string
         'install-demo' => 'Die Demo-AGs konnten nicht vollständig angelegt werden. Es wurden keine Teiländerungen übernommen.',
         'update-registration' => 'Die Anmeldung konnte nicht aktualisiert werden.',
         'export' => 'Der CSV-Export konnte nicht erstellt werden.',
+        'course-export' => 'Der AG-CSV-Export konnte nicht erstellt werden.',
+        'course-import' => 'Die AG-CSV konnte nicht sicher geprüft oder importiert werden.',
+        'registration-import' => 'Die Anmeldungs-CSV konnte nicht importiert werden. Die verständliche Ursache steht im Importbericht.',
+        'delete-old-registrations' => 'Die alten Anmeldungen konnten nicht vollständig gelöscht werden. Es wurden keine Teiländerungen übernommen.',
     );
 
     return $messages[$code] ?? 'Die angeforderten AG-Daten konnten nicht verarbeitet werden.';
@@ -81,14 +85,75 @@ function flz_ags_manage_capability(): string
 
 function flz_ags_default_school_year(): string
 {
-    $year = (int) current_time('Y');
-    $month = (int) current_time('n');
+    return flz_ags_default_school_year_for_date(current_datetime());
+}
 
-    if ($month >= 8) {
+/**
+ * Bestimmt das Schuljahr am Berliner Sommerferienbeginn.
+ *
+ * Quelle der Stichtage 2025–2030: Langfristige Sommerferienregelung der
+ * Kultusministerkonferenz, Beschluss vom 09.12.2021.
+ * https://www.kmk.org/fileadmin/Dateien/pdf/Ferienkalender/Sommerferienregelung_2025-2030_2022-09-21.pdf
+ */
+function flz_ags_default_school_year_for_date(DateTimeInterface $date): string
+{
+    $year = (int) $date->format('Y');
+    $summer_holiday_starts = array(
+        2025 => '2025-07-24',
+        2026 => '2026-07-09',
+        2027 => '2027-07-01',
+        2028 => '2028-07-01',
+        2029 => '2029-07-01',
+        2030 => '2030-07-04',
+    );
+
+    // Für noch nicht amtlich veröffentlichte Jahre bleibt die bisherige
+    // Umschaltung zum 1. August erhalten, statt einen Ferientermin zu erfinden.
+    $rollover_date = $summer_holiday_starts[$year] ?? sprintf('%04d-08-01', $year);
+    $rollover = new DateTimeImmutable($rollover_date . ' 00:00:00', $date->getTimezone());
+
+    if ($date >= $rollover) {
         return $year . '/' . ($year + 1);
     }
 
     return ($year - 1) . '/' . $year;
+}
+
+/**
+ * Liefert Standardwert und Optionen für Schuljahrfelder der Gutenberg-Blöcke.
+ *
+ * @return array{default:string,options:array<string,string>}
+ */
+function flz_ags_block_school_year_selection(): array
+{
+    $default = flz_ags_default_school_year();
+    $school_years = array($default);
+
+    if (class_exists('FLZ_AGS_Course')) {
+        try {
+            $school_years = array_merge($school_years, FLZ_AGS_Course::find_school_years());
+        } catch (Throwable $error) {
+            flz_ags_log_error($error, 'Laden der Schuljahre für Gutenberg-Blöcke');
+        }
+    }
+
+    $school_years = array_values(array_unique(array_filter(
+        array_map('strval', $school_years),
+        static function (string $school_year): bool {
+            return preg_match('/^\d{4}\/\d{4}$/', $school_year) === 1;
+        }
+    )));
+    rsort($school_years, SORT_STRING);
+
+    $options = array();
+    foreach ($school_years as $school_year) {
+        $options[$school_year] = $school_year;
+    }
+
+    return array(
+        'default' => $default,
+        'options' => $options,
+    );
 }
 
 function flz_ags_current_school_year(): string
@@ -358,6 +423,22 @@ function flz_ags_status_label(string $status): string
     return $labels[$status] ?? $status;
 }
 
+function flz_ags_registration_retention_months(): int
+{
+    return max(1, min(120, absint(get_option('flz_ags_registration_retention_months', 24))));
+}
+
+/**
+ * Das ursprüngliche Anmeldedatum ist die alleinige Fristbasis; Statusänderungen
+ * verlängern die Speicherung personenbezogener Daten nicht.
+ */
+function flz_ags_registration_retention_cutoff(): string
+{
+    return current_datetime()
+        ->modify('-' . flz_ags_registration_retention_months() . ' months')
+        ->format('Y-m-d H:i:s');
+}
+
 function flz_ags_format_time(?string $time): string
 {
     if (function_exists('flz_ui_format_time')) {
@@ -563,31 +644,19 @@ function flz_ags_demo_source_pages(): array
 function flz_ags_demo_course_from_page(WP_Post $page, int $index): array
 {
     $plain = flz_ags_page_plain_text((string) $page->post_content);
-    $description = flz_ags_extract_labeled_value($plain, 'Beschreibung');
-    if ($description === '') {
-        $description = wp_trim_words($plain, 55, ' …');
-    }
-
-    $focus = flz_ags_extract_labeled_value($plain, 'Das soll dabei im Fokus stehen');
-    $excerpt = trim(wp_strip_all_tags((string) $page->post_excerpt));
-    $short_description = $excerpt !== '' ? $excerpt : $focus;
-    if ($short_description === '') {
-        $short_description = wp_trim_words($description, 24, ' …');
-    }
-
     $allowed_grades = flz_ags_allowed_grades_from_demo_text(
         flz_ags_extract_labeled_value($plain, 'Jahrgang')
     );
 
     return array(
-        'title' => sanitize_text_field(get_the_title($page)),
-        'short_description' => sanitize_textarea_field($short_description),
-        'description' => sanitize_textarea_field($description),
-        'category' => '',
-        'leader_name' => sanitize_text_field(flz_ags_demo_leader_from_page($page)),
+        'title' => sprintf('Demo-AG %02d', $index + 1),
+        'short_description' => 'Synthetischer Datensatz für lokale Funktionsprüfungen.',
+        'description' => 'Diese Demo enthält keine Namen, Bilder oder redaktionellen Freitexte der verknüpften Seite.',
+        'category' => 'Demo',
+        'leader_name' => '',
         'allowed_grades' => $allowed_grades,
         'only_grade_7' => $allowed_grades === '7' ? 1 : 0,
-        'image_url' => esc_url_raw(flz_ags_page_image_url((int) $page->ID, (string) $page->post_content)),
+        'image_url' => '',
         'detail_page_id' => (int) $page->ID,
         'sort_order' => ($index + 1) * 10,
         'slots' => flz_ags_demo_slots_from_page_text($plain),
@@ -632,38 +701,6 @@ function flz_ags_extract_labeled_value(string $plain, string $label): string
     return trim((string) $matches[1]);
 }
 
-function flz_ags_demo_leader_from_page(WP_Post $page): string
-{
-    $leader = flz_ags_extract_labeled_value(flz_ags_page_plain_text((string) $page->post_content), 'Leitung');
-    if ($leader !== '') {
-        return $leader;
-    }
-
-    if (preg_match('/<tr[^>]*>\s*<td[^>]*>(.*?)<\/td>/is', (string) $page->post_content, $matches)) {
-        $leader = trim(wp_strip_all_tags((string) $matches[1]));
-        $leader = (string) preg_replace('/\s+/u', ' ', html_entity_decode($leader, ENT_QUOTES | ENT_HTML5, get_bloginfo('charset') ?: 'UTF-8'));
-        if ($leader !== '' && stripos($leader, get_the_title($page)) === false) {
-            return $leader;
-        }
-    }
-
-    return '';
-}
-
-function flz_ags_page_image_url(int $page_id, string $content): string
-{
-    $thumbnail = get_the_post_thumbnail_url($page_id, 'medium_large');
-    if (is_string($thumbnail) && $thumbnail !== '') {
-        return $thumbnail;
-    }
-
-    if (preg_match('/<img[^>]+src=["\']([^"\']+)["\']/i', $content, $matches)) {
-        return (string) $matches[1];
-    }
-
-    return '';
-}
-
 function flz_ags_allowed_grades_from_demo_text(string $value): string
 {
     $value = strtoupper(str_replace(array('–', '—'), '-', $value));
@@ -699,7 +736,7 @@ function flz_ags_demo_slots_from_page_text(string $plain): array
     }
 
     $slots = array();
-    $room = sanitize_text_field(flz_ags_extract_labeled_value($plain, 'Raum'));
+    $room = '';
     $max_participants = flz_ags_demo_max_participants($plain);
     foreach ($matches as $match) {
         $weekday = flz_ags_weekday_from_label((string) $match[1]);

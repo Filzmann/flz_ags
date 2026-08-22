@@ -26,6 +26,7 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
 
     // Optionale Anzeige- und Exportfelder aus den JOIN-Abfragen.
     public ?string $title;
+    public ?string $slug;
     public ?int $weekday;
     public ?string $start_time;
     public ?string $end_time;
@@ -49,6 +50,7 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
         $this->created_at = $data['created_at'] ?? null;
         $this->updated_at = $data['updated_at'] ?? null;
         $this->title = $data['title'] ?? null;
+        $this->slug = $data['slug'] ?? null;
         $this->weekday = isset($data['weekday']) ? (int) $data['weekday'] : null;
         $this->start_time = $data['start_time'] ?? null;
         $this->end_time = $data['end_time'] ?? null;
@@ -60,17 +62,61 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
         $order_sql = $export_order
             ? 'c.title ASC, s.weekday ASC, r.class_name ASC, r.student_last_name ASC'
             : 'r.class_name ASC, r.student_last_name ASC, r.student_first_name ASC';
-        $sql = 'SELECT r.*, c.title, s.weekday, s.start_time, s.end_time, s.room '
+        $status_sql = 'all' === $status ? '' : ' AND r.status = %s';
+        $values = 'all' === $status ? array($school_year) : array($school_year, $status);
+        $sql = 'SELECT r.*, c.title, c.slug, s.weekday, s.start_time, s.end_time, s.room '
             . 'FROM ' . static::table_name() . ' r '
             . 'INNER JOIN ' . FLZ_AGS_Course::table_name() . ' c ON c.id = r.course_id '
             . 'INNER JOIN ' . FLZ_AGS_Slot::table_name() . ' s ON s.id = r.slot_id '
-            . 'WHERE r.school_year = %s AND r.status = %s ORDER BY ' . $order_sql;
+            . 'WHERE r.school_year = %s' . $status_sql . ' ORDER BY ' . $order_sql;
 
         return static::query_models(
             $sql,
-            array($school_year, $status),
+            $values,
             $export_order ? 'Laden der AG-Anmeldungen für den CSV-Export' : 'Laden der AG-Anmeldungen'
         );
+    }
+
+    public static function find_backup_match(array $data): ?self
+    {
+        $sql = 'SELECT * FROM ' . static::table_name()
+            . ' WHERE school_year = %s AND course_id = %d AND slot_id = %d AND class_name = %s'
+            . ' AND student_first_name = %s AND student_last_name = %s AND created_at = %s'
+            . ' ORDER BY id ASC LIMIT 2';
+        $models = static::query_models($sql, array(
+            $data['school_year'],
+            $data['course_id'],
+            $data['slot_id'],
+            $data['class_name'],
+            $data['student_first_name'],
+            $data['student_last_name'],
+            $data['created_at'],
+        ), 'Suchen einer bereits importierten AG-Anmeldung');
+        if (count($models) > 1) {
+            throw new UnexpectedValueException('Die Anmeldung ist anhand ihrer Backupdaten nicht eindeutig.');
+        }
+        return $models[0] ?? null;
+    }
+
+    public static function find_active_for_student(string $school_year, string $class_name, string $first_name, string $last_name): ?self
+    {
+        $sql = 'SELECT * FROM ' . static::table_name()
+            . ' WHERE school_year = %s AND class_name = %s AND student_first_name = %s'
+            . ' AND student_last_name = %s AND status = \'active\' ORDER BY id ASC LIMIT 1';
+        $models = static::query_models(
+            $sql,
+            array($school_year, $class_name, $first_name, $last_name),
+            'Prüfen aktiver Anmeldungen während des Backup-Imports'
+        );
+        return $models[0] ?? null;
+    }
+
+    /** @return array<int,self> */
+    public static function find_created_before(string $cutoff): array
+    {
+        $sql = 'SELECT * FROM ' . static::table_name()
+            . ' WHERE created_at < %s ORDER BY created_at ASC, id ASC';
+        return static::query_models($sql, array($cutoff), 'Laden abgelaufener AG-Anmeldungen');
     }
 
     protected static function get_table_schema(): string

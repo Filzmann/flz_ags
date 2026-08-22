@@ -1,6 +1,70 @@
-# FLZ AG-Verwaltung 0.3.10
+# FLZ AG-Verwaltung 0.5.0
 
 Initiale WordPress-Plugin-Version für AG-Verwaltung und AG-Anmeldung.
+
+## Neu in 0.5.0
+
+- Der Anmeldungs-Download ist ein versioniertes, wiederherstellbares Backup und
+  enthält unabhängig vom Tabellenfilter alle Status des gewählten Schuljahrs.
+- Anmeldungs-Backups können direkt hochgeladen werden. Portable AG- und
+  Terminschlüssel ersetzen installationsabhängige IDs; nicht auflösbare Zeilen
+  werden mit Zeilennummer übersprungen und ungefährliche Lücken mit sicheren
+  Platzhaltern ergänzt.
+- Wiederholte Imports aktualisieren identische Backupdatensätze, versenden keine
+  Bestätigungsmails und schützen eine bereits vorhandene andere aktive
+  Anmeldung derselben Schüler*in.
+- In den Einstellungen kann eine Aufbewahrungsfrist von 1 bis 120 Monaten
+  aktiviert werden. Sie ist standardmäßig ausgeschaltet und zählt immer ab dem
+  ursprünglichen Anmeldedatum.
+- Ein täglicher WordPress-Cron-Job löscht abgelaufene Anmeldungen nur bei
+  aktivierter Regel. Eine zusätzlich bestätigte manuelle Löschung zeigt die
+  Anzahl dauerhaft gelöschter Datensätze; die Deaktivierung des Plugins löscht
+  keine Daten.
+
+## Neu in 0.4.0
+
+- AG-Stammdaten und zugehörige Termine lassen sich als versionierte CSV-Datei
+  exportieren und wieder importieren.
+- Beim Export entscheidet eine standardmäßig aktivierte Checkbox, ob Termine
+  beziehungsweise Slots enthalten sein sollen. Der Import erkennt beide
+  Varianten automatisch.
+- Der Import aktualisiert oder ergänzt Datensätze über portable fachliche
+  Schlüssel; nicht aufgeführte AGs und Termine bleiben erhalten.
+- Beim Import können die Schuljahre der CSV beibehalten oder alle enthaltenen
+  AGs samt Slots einem ausgewählten Zielschuljahr zugeordnet werden. Kollidiert
+  dabei derselbe Slug aus mehreren Quelljahren, gewinnt das neueste Quelljahr
+  und der ausgelassene Datensatz wird gemeldet.
+- Der Upload importiert brauchbare Datensätze direkt. Fehlende optionale Werte
+  erhalten sichere Standardwerte; fehlerhafte oder doppelte Einzelzeilen werden
+  ausgelassen, ohne die übrige Datei zu verwerfen.
+- Nach dem Import zeigt die AG-Verwaltung eine Bilanz und zeilenbezogene Hinweise
+  zu allen Korrekturen und ausgelassenen Datensätzen.
+- Capability, Nonce und Grundformat werden serverseitig geprüft; alle
+  akzeptierten Datensätze werden gemeinsam in einer Transaktion übernommen.
+
+## Neu in 0.3.13
+
+- Bei AGs ohne Detailseite öffnet der primäre Detailbutton „Anmeldung“ das
+  Anmeldeformular im gleichen zugänglichen Drawer wie der Floating-Button
+  einer Detailseite. Er entspricht optisch dem regulären Button „Details und
+  Anmeldung“ einer AG mit Detailseite.
+- Das Formular wird nicht mehr sichtbar unter der AG-Karte angehängt.
+- „AG speichern“ verwendet das Speichern-Icon, „Speichern und neu“ ein
+  kombiniertes Disketten-/Plus-Icon.
+
+## Neu in 0.3.12
+
+- AGs ohne gültige Detailseite zeigen bei geöffneter Anmeldung das
+  Anmeldeformular direkt unter der AG-Karte in der öffentlichen Liste.
+- Auf Listen mit mehreren Formularen werden POST-Daten nur im Formular der
+  tatsächlich abgesendeten AG verarbeitet und wieder angezeigt.
+
+## Neu in 0.3.11
+
+- Die Gutenberg-Blöcke bieten vorhandene AG-Schuljahre als Dropdown an.
+- Das Standardschuljahr wechselt mit Beginn der amtlichen Berliner
+  Sommerferien auf das kommende Schuljahr. Die veröffentlichten Termine bis
+  2030 sind hinterlegt; für spätere Jahre bleibt der 1. August der Fallback.
 
 ## Neu in 0.3.10
 
@@ -205,7 +269,11 @@ Danach im Backend:
 
 - Datenschutzhinweis der Schule für AG-Anmeldungen ergänzen/verlinken.
 - Festlegen, wer Anmeldungen sehen/exportieren darf. Aktuell: `manage_options`, per Filter änderbar.
-- Lösch-/Anonymisierungsfrist nach Schuljahr definieren. Eine automatische Löschroutine ist in 0.2.0 noch nicht enthalten.
+- Die schulische Löschfrist festlegen und unter `FLZ AGs → Einstellungen`
+  aktivieren. Standard sind 24 Monate ab Anmeldedatum; die Automatik ist bis
+  zur bewussten Aktivierung ausgeschaltet.
+- Vor einer manuellen Löschung bei Bedarf auf `FLZ AGs → Anmeldungen` ein
+  vollständiges CSV-Backup des betreffenden Schuljahrs herunterladen.
 - E-Mail-Zustellbarkeit auf Staging prüfen; lokal werden Mails über DDEV
   abgefangen.
 - Kein externes Captcha, keine Akismet-Weitergabe von Anmeldedaten.
@@ -215,6 +283,5 @@ Danach im Backend:
 
 - Wartelistenautomatik
 - Frontend-Widerruf durch Eltern/Schüler*innen
-- automatische Löschroutine
 - Import bestehender AG-Seiten
 - erweiterte Rollenverwaltung

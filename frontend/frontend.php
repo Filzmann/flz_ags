@@ -40,8 +40,29 @@ function flz_ags_render_frontend_filters(bool $include_classes): void
  */
 function flz_ags_render_course_card(object $course): void
 {
+    $card_args = flz_ags_course_card_args($course);
+    $filter_attrs = isset($card_args['attrs']) && is_array($card_args['attrs']) ? $card_args['attrs'] : array();
+    unset($card_args['attrs']);
+    $registration_html = (string) ($course->registration_html ?? '');
+    $registration_panel_html = '';
+
+    if ($registration_html !== '') {
+        $registration_panel_html = flz_ui()->floating_action_panel(array(
+            'id' => 'flz-ags-list-registration-' . (int) $course->id,
+            'title' => 'AG-Anmeldung: ' . (string) $course->title,
+            'button_label' => 'Anmeldung',
+            'button_icon' => 'view',
+            'button_variant' => 'primary',
+            'content' => $registration_html,
+            'open' => !empty($course->registration_panel_open),
+            'class' => 'flz-ags-registration-panel flz-ags-card-registration-panel',
+        ));
+    }
+
     flz_ags_render_frontend_template('course-card', array(
-        'card_args' => flz_ags_course_card_args($course),
+        'card_args' => $card_args,
+        'filter_attrs' => $filter_attrs,
+        'registration_panel_html' => $registration_panel_html,
     ));
 }
 

@@ -27,6 +27,8 @@ class FLZ_AGS_Course extends FLZ_AGS_Model
     public ?string $created_at;
     public ?string $updated_at;
     public array $slots = array();
+    public string $registration_html = '';
+    public bool $registration_panel_open = false;
 
     public function __construct(array $data = array())
     {
@@ -58,6 +60,38 @@ class FLZ_AGS_Course extends FLZ_AGS_Model
             . ' ORDER BY sort_order ASC, title ASC';
 
         return static::query_models($sql, array($school_year), 'Laden der AGs für ein Schuljahr');
+    }
+
+    public static function find_by_school_year_and_slug(string $school_year, string $slug): ?self
+    {
+        $sql = 'SELECT * FROM ' . static::table_name()
+            . ' WHERE school_year = %s AND slug = %s ORDER BY id ASC LIMIT 2';
+        $models = static::query_models($sql, array($school_year, $slug), 'Auflösen einer AG für den Anmeldungs-Import');
+        if (count($models) > 1) {
+            throw new UnexpectedValueException('Der AG-Slug ist im Schuljahr nicht eindeutig.');
+        }
+        return $models[0] ?? null;
+    }
+
+    /**
+     * Liefert alle in AG-Datensätzen vorhandenen Schuljahre.
+     *
+     * @return array<int,string>
+     */
+    public static function find_school_years(): array
+    {
+        $sql = 'SELECT DISTINCT school_year FROM ' . static::table_name()
+            . " WHERE school_year <> '' ORDER BY school_year DESC";
+        $rows = static::query_rows($sql, array(), 'Laden der vorhandenen AG-Schuljahre');
+        $school_years = array();
+
+        foreach ($rows as $row) {
+            if (is_object($row) && isset($row->school_year)) {
+                $school_years[] = (string) $row->school_year;
+            }
+        }
+
+        return $school_years;
     }
 
     public static function find_public_by_detail_page_id(int $detail_page_id, string $school_year): ?self

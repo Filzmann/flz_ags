@@ -26,6 +26,10 @@ class FLZ_AGS_Plugin
         add_action('admin_post_flz_ags_save_settings', array($this, 'handle_save_settings'));
         add_action('admin_post_flz_ags_update_registration', array($this, 'handle_update_registration'));
         add_action('admin_post_flz_ags_export_csv', array($this, 'handle_export_csv'));
+        add_action('admin_post_flz_ags_import_registrations_csv', array($this, 'handle_import_registrations_csv'));
+        add_action('admin_post_flz_ags_delete_old_registrations', array($this, 'handle_delete_old_registrations'));
+        add_action('admin_post_flz_ags_export_courses_csv', array($this, 'handle_export_courses_csv'));
+        add_action('admin_post_flz_ags_import_courses_csv', array($this, 'handle_import_courses_csv'));
         add_action('admin_post_flz_ags_install_demo', array($this, 'handle_install_demo'));
         add_action('wp_ajax_flz_ags_search_detail_pages', array($this, 'ajax_search_detail_pages'));
         add_action('wp_ajax_flz_ags_create_detail_page', array($this, 'ajax_create_detail_page'));
@@ -37,6 +41,7 @@ class FLZ_AGS_Plugin
         add_filter('the_content', array($this, 'append_registration_to_detail_page'));
         add_action('wp_enqueue_scripts', array($this, 'register_frontend_assets'));
         add_action('admin_enqueue_scripts', array($this, 'register_admin_assets'));
+        add_action('flz_ags_daily_registration_cleanup', array($this, 'handle_scheduled_registration_cleanup'));
     }
 
     public function register_blocks(): void
@@ -44,6 +49,8 @@ class FLZ_AGS_Plugin
         if (!function_exists('flz_ui_register_shortcode_block')) {
             return;
         }
+
+        $school_year_selection = flz_ags_block_school_year_selection();
 
         flz_ui_register_shortcode_block(array(
             'name' => 'flz/ags-list',
@@ -55,13 +62,15 @@ class FLZ_AGS_Plugin
             'attributes' => array(
                 'school_year' => array(
                     'type' => 'string',
-                    'default' => '',
+                    'default' => $school_year_selection['default'],
                 ),
             ),
             'fields' => array(
                 'school_year' => array(
                     'label' => 'Schuljahr',
-                    'description' => 'Optional, z. B. 2026/2027. Leer verwendet das aktuelle AG-Schuljahr.',
+                    'description' => 'Vorhandenes AG-Schuljahr auswählen.',
+                    'control' => 'select',
+                    'options' => $school_year_selection['options'],
                 ),
             ),
         ));
@@ -76,7 +85,7 @@ class FLZ_AGS_Plugin
             'attributes' => array(
                 'school_year' => array(
                     'type' => 'string',
-                    'default' => '',
+                    'default' => $school_year_selection['default'],
                 ),
                 'course_id' => array(
                     'type' => 'string',
@@ -86,7 +95,9 @@ class FLZ_AGS_Plugin
             'fields' => array(
                 'school_year' => array(
                     'label' => 'Schuljahr',
-                    'description' => 'Optional, z. B. 2026/2027. Leer verwendet das aktuelle AG-Schuljahr.',
+                    'description' => 'Vorhandenes AG-Schuljahr auswählen.',
+                    'control' => 'select',
+                    'options' => $school_year_selection['options'],
                 ),
                 'course_id' => array(
                     'label' => 'AG-ID',
@@ -302,6 +313,7 @@ class FLZ_AGS_Plugin
 
         $action = isset($_GET['action']) ? sanitize_key(wp_unslash($_GET['action'])) : '';
         $course_id = isset($_GET['course_id']) ? absint($_GET['course_id']) : 0;
+        $csv_report = null;
 
         echo '<div class="wrap flz-ags-admin">';
         echo '<h1>FLZ AGs</h1>';
@@ -313,16 +325,43 @@ class FLZ_AGS_Plugin
             $count = absint($_GET['demo']);
             echo wp_kses_post(flz_ags_notice($count . ' Demo-AGs wurden angelegt. Bereits vorhandene Demo-AGs wurden übersprungen.'));
         }
+        if (isset($_GET['csv_imported'])) {
+            $stored_report = get_transient($this->course_csv_report_key());
+            if (is_array($stored_report)) {
+                $csv_report = $stored_report;
+                $notice_type = empty($csv_report['warnings']) ? 'success' : 'warning';
+                echo wp_kses_post(flz_ags_notice(sprintf(
+                    'CSV-Import abgeschlossen: %d AGs neu, %d AGs aktualisiert, %d Termine neu und %d Termine aktualisiert. %d Hinweise wurden protokolliert. %s',
+                    (int) ($csv_report['courses_created'] ?? 0),
+                    (int) ($csv_report['courses_updated'] ?? 0),
+                    (int) ($csv_report['slots_created'] ?? 0),
+                    (int) ($csv_report['slots_updated'] ?? 0),
+                    count((array) ($csv_report['warnings'] ?? array())),
+                    (string) ($csv_report['school_year_note'] ?? '')
+                ), $notice_type));
+            } else {
+                echo wp_kses_post(flz_ags_notice('Der AG-CSV-Import wurde verarbeitet.'));
+            }
+            delete_transient($this->course_csv_report_key());
+        }
         if (isset($_GET['flz_ags_error'])) {
             $error_code = sanitize_key(wp_unslash($_GET['flz_ags_error']));
-            echo wp_kses_post(flz_ags_notice(flz_ags_error_message($error_code), 'error'));
+            $error_message = flz_ags_error_message($error_code);
+            if ('course-import' === $error_code) {
+                $csv_error = get_transient($this->course_csv_notice_key());
+                if (is_string($csv_error) && '' !== trim($csv_error)) {
+                    $error_message = $csv_error;
+                }
+                delete_transient($this->course_csv_notice_key());
+            }
+            echo wp_kses_post(flz_ags_notice($error_message, 'error'));
         }
 
         try {
             if ($action === 'new' || ($action === 'edit' && $course_id > 0)) {
                 $this->render_course_form($course_id);
             } else {
-                $this->render_course_list();
+                $this->render_course_list($csv_report);
             }
         } catch (Throwable $error) {
             flz_ags_log_error($error, 'Anzeigen der AG-Verwaltung');
@@ -430,13 +469,27 @@ class FLZ_AGS_Plugin
         );
     }
 
-    private function render_course_list(): void
+    private function render_course_list(?array $csv_report = null): void
     {
         $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_GET['school_year']))) : flz_ags_current_school_year();
         $courses = $this->get_courses($school_year, false);
+        $target_school_year = flz_ags_default_school_year();
+        $school_year_options = flz_ags_block_school_year_selection()['options'];
+        $school_year_options[$school_year] = $school_year;
+        $school_year_options[$target_school_year] = $target_school_year;
+        if (preg_match('/^(\d{4})\/(\d{4})$/', $target_school_year, $matches)) {
+            for ($offset = 1; $offset <= 3; ++$offset) {
+                $future_school_year = ((int) $matches[1] + $offset) . '/' . ((int) $matches[2] + $offset);
+                $school_year_options[$future_school_year] = $future_school_year;
+            }
+        }
+        krsort($school_year_options, SORT_STRING);
         flz_ags_render_backend_template('course-list', array(
             'school_year' => $school_year,
             'courses' => $courses,
+            'csv_report' => $csv_report,
+            'target_school_year' => $target_school_year,
+            'school_year_options' => $school_year_options,
         ));
     }
 
@@ -459,6 +512,7 @@ class FLZ_AGS_Plugin
         $now = current_time('mysql');
         $course_id = isset($_POST['course_id']) ? absint($_POST['course_id']) : 0;
         $title = isset($_POST['title']) ? sanitize_text_field(wp_unslash($_POST['title'])) : '';
+        $save_and_new = isset($_POST['save_and_new']);
 
         if ($title === '') {
             wp_die(esc_html__('Der Titel ist erforderlich.', 'flz-ags'));
@@ -475,10 +529,7 @@ class FLZ_AGS_Plugin
 
         try {
             $detail_page_id = $this->validate_detail_page_id($detail_page_id);
-            if ($registration_open && $detail_page_id <= 0) {
-                throw new UnexpectedValueException('Für eine geöffnete AG-Anmeldung muss eine Detailseite ausgewählt oder angelegt werden.');
-            }
-            if ($registration_open && get_post_status($detail_page_id) !== 'publish') {
+            if ($registration_open && $detail_page_id > 0 && get_post_status($detail_page_id) !== 'publish') {
                 throw new UnexpectedValueException('Für eine geöffnete AG-Anmeldung muss die Detailseite veröffentlicht sein.');
             }
 
@@ -590,9 +641,11 @@ class FLZ_AGS_Plugin
             );
         }
 
-        flz_ags_safe_redirect(
-            flz_ags_admin_url(array('page' => 'flz-ags', 'action' => 'edit', 'course_id' => $course_id, 'saved' => 1))
-        );
+        $redirect_args = $save_and_new
+            ? array('page' => 'flz-ags', 'action' => 'new', 'saved' => 1)
+            : array('page' => 'flz-ags', 'action' => 'edit', 'course_id' => $course_id, 'saved' => 1);
+
+        flz_ags_safe_redirect(flz_ags_admin_url($redirect_args));
     }
 
     public function render_admin_settings_page(): void
@@ -609,6 +662,10 @@ class FLZ_AGS_Plugin
         if (isset($_GET['saved'])) {
             echo wp_kses_post(flz_ags_notice('Einstellungen gespeichert.'));
         }
+        if (isset($_GET['deleted'])) {
+            $deleted = absint(wp_unslash($_GET['deleted']));
+            echo wp_kses_post(flz_ags_notice($deleted . ' alte Anmeldung(en) wurden dauerhaft gelöscht.'));
+        }
         if (isset($_GET['flz_ags_error'])) {
             $error_code = sanitize_key(wp_unslash($_GET['flz_ags_error']));
             echo wp_kses_post(flz_ags_notice(flz_ags_error_message($error_code), 'error'));
@@ -618,6 +675,8 @@ class FLZ_AGS_Plugin
             'parent_page_id' => $parent_page_id,
             'configured_parent_page_id' => $configured_parent_page_id,
             'parent_hint' => $parent_hint,
+            'registration_retention_enabled' => (bool) get_option('flz_ags_registration_retention_enabled', 0),
+            'registration_retention_months' => flz_ags_registration_retention_months(),
         ));
         echo '</div>';
     }
@@ -631,15 +690,22 @@ class FLZ_AGS_Plugin
         $classes_text = isset($_POST['classes_text']) ? sanitize_textarea_field(wp_unslash($_POST['classes_text'])) : '';
         $classes = isset($_POST['reset_classes']) ? flz_ags_default_classes() : flz_ags_sanitize_classes_from_text($classes_text);
         $parent_page_id = isset($_POST['parent_page_id']) ? absint(wp_unslash($_POST['parent_page_id'])) : 0;
+        $retention_enabled = isset($_POST['registration_retention_enabled']) ? 1 : 0;
+        $retention_months = isset($_POST['registration_retention_months'])
+            ? max(1, min(120, absint(wp_unslash($_POST['registration_retention_months']))))
+            : 24;
 
         try {
             if ($parent_page_id > 0) {
                 $parent_page_id = $this->validate_detail_page_id($parent_page_id);
             }
 
+            $retention_enabled ? flz_ags_schedule_registration_cleanup() : flz_ags_unschedule_registration_cleanup();
             update_option('flz_ags_current_school_year', $school_year, false);
             update_option('flz_ags_classes', !empty($classes) ? $classes : flz_ags_default_classes(), false);
             update_option('flz_ags_parent_page_id', $parent_page_id, false);
+            update_option('flz_ags_registration_retention_months', $retention_months, false);
+            update_option('flz_ags_registration_retention_enabled', $retention_enabled, false);
         } catch (Throwable $error) {
             $this->redirect_admin_error(
                 $error,
@@ -779,6 +845,17 @@ class FLZ_AGS_Plugin
         $school_year = flz_ags_sanitize_school_year($atts['school_year']);
         try {
             $courses = $this->get_public_courses_with_slots($school_year);
+            foreach ($courses as $course) {
+                $course->registration_html = '';
+                $course->registration_panel_open = false;
+                if (flz_ags_course_detail_page_id($course) <= 0 && !empty($course->registration_open)) {
+                    $course->registration_html = $this->shortcode_registration(array(
+                        'school_year' => $school_year,
+                        'course_id' => (int) $course->id,
+                    ));
+                    $course->registration_panel_open = $this->is_registration_post_for_course((int) $course->id);
+                }
+            }
         } catch (Throwable $error) {
             flz_ags_log_error($error, 'Anzeigen der öffentlichen AG-Liste');
             return '<div class="flz-ags">' . flz_ags_notice('Die AG-Liste kann derzeit nicht geladen werden. Bitte später erneut versuchen.', 'error') . '</div>';
@@ -838,7 +915,8 @@ class FLZ_AGS_Plugin
             $detail_page_id = flz_ags_course_detail_page_id($course);
             if (
                 !$this->rendering_embedded_registration
-                && ($detail_page_id <= 0 || $detail_page_id !== (int) get_queried_object_id())
+                && $detail_page_id > 0
+                && $detail_page_id !== (int) get_queried_object_id()
             ) {
                 return flz_ags_get_frontend_template('registration', array(
                     'heading' => 'AG-Anmeldung: ' . (string) $course->title,
@@ -849,8 +927,12 @@ class FLZ_AGS_Plugin
             }
 
             $request_method = isset($_SERVER['REQUEST_METHOD']) ? sanitize_key(wp_unslash($_SERVER['REQUEST_METHOD'])) : '';
-            // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Die Nonce wird direkt in handle_frontend_registration() geprüft und liefert dort die fachliche Fehlermeldung.
-            if ('post' === $request_method && isset($_POST['flz_ags_registration_submit'])) {
+            if (
+                'post' === $request_method
+                // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Die Nonce wird direkt in handle_frontend_registration() geprüft und liefert dort die fachliche Fehlermeldung.
+                && isset($_POST['flz_ags_registration_submit'])
+                && $this->is_registration_post_for_course((int) $course->id)
+            ) {
                 $result = $this->handle_frontend_registration($school_year, (int) $course->id);
                 $messages = $result['messages'];
                 $success = $result['success'];
@@ -1017,7 +1099,11 @@ class FLZ_AGS_Plugin
             'slot_id' => 0,
         );
 
-        if (isset($_POST['flz_ags_nonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['flz_ags_nonce'])), 'flz_ags_frontend_registration')) {
+        if (
+            $this->is_registration_post_for_course((int) $course->id)
+            && isset($_POST['flz_ags_nonce'])
+            && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['flz_ags_nonce'])), 'flz_ags_frontend_registration')
+        ) {
             $posted['class_name'] = isset($_POST['class_name']) ? flz_ags_normalize_class_name(sanitize_text_field(wp_unslash($_POST['class_name']))) : '';
             $posted['student_first_name'] = isset($_POST['student_first_name']) ? sanitize_text_field(wp_unslash($_POST['student_first_name'])) : '';
             $posted['student_last_name'] = isset($_POST['student_last_name']) ? sanitize_text_field(wp_unslash($_POST['student_last_name'])) : '';
@@ -1225,6 +1311,12 @@ class FLZ_AGS_Plugin
         if (isset($_GET['updated'])) {
             echo wp_kses_post(flz_ags_notice('Anmeldung aktualisiert.'));
         }
+        $csv_report = get_transient($this->registration_csv_report_key());
+        if (is_array($csv_report)) {
+            delete_transient($this->registration_csv_report_key());
+        } else {
+            $csv_report = null;
+        }
         if (isset($_GET['flz_ags_error'])) {
             $error_code = sanitize_key(wp_unslash($_GET['flz_ags_error']));
             echo wp_kses_post(flz_ags_notice(flz_ags_error_message($error_code), 'error'));
@@ -1239,6 +1331,7 @@ class FLZ_AGS_Plugin
             'school_year' => $school_year,
             'status' => $status,
             'registrations' => $registrations,
+            'csv_report' => $csv_report,
         ));
         echo '</div>';
     }
@@ -1278,48 +1371,531 @@ class FLZ_AGS_Plugin
         flz_ags_safe_redirect(flz_ags_admin_url(array('page' => 'flz-ags-registrations', 'updated' => 1)));
     }
 
+    /**
+     * Streamt die AGs des gewählten Schuljahrs einschließlich ihrer Termine.
+     */
+    public function handle_export_courses_csv(): void
+    {
+        $this->assert_admin_permission();
+        check_admin_referer('flz_ags_export_courses_csv');
+
+        $school_year = isset($_GET['school_year'])
+            ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_GET['school_year'])))
+            : flz_ags_current_school_year();
+        $include_slots = isset($_GET['include_slots']);
+
+        try {
+            $courses = $this->get_courses($school_year, false);
+            $rows = FLZ_AGS_Course_CSV::export_rows(
+                $courses,
+                fn(int $course_id): array => $include_slots ? $this->get_course_slots($course_id, true) : array(),
+                static function (int $detail_page_id): string {
+                    $path = get_page_uri($detail_page_id);
+                    if (!is_string($path) || '' === trim($path)) {
+                        throw new UnexpectedValueException('Eine verknüpfte AG-Detailseite besitzt keinen exportierbaren Seitenpfad.');
+                    }
+                    return $path;
+                }
+            );
+            flz_wpdb_objects_send_csv_download(
+                FLZ_AGS_Course_CSV::header(),
+                $rows,
+                'flz-ags-' . sanitize_file_name($school_year) . ($include_slots ? '-mit-slots' : '-ohne-slots') . '.csv'
+            );
+        } catch (Throwable $error) {
+            $this->redirect_admin_error(
+                $error,
+                'Erstellen des AG-/Slot-CSV-Exports',
+                'course-export',
+                array('page' => 'flz-ags', 'school_year' => $school_year)
+            );
+        }
+    }
+
+    /**
+     * Importiert alle brauchbaren Teile einer versionierten AG-/Slot-CSV-Datei.
+     */
+    public function handle_import_courses_csv(): void
+    {
+        $this->assert_admin_permission();
+        check_admin_referer('flz_ags_import_courses_csv');
+
+        $is_import = isset($_POST['submit_csv']);
+        $school_year_mode = isset($_POST['school_year_mode'])
+            ? sanitize_key(wp_unslash($_POST['school_year_mode']))
+            : 'preserve';
+        if (!in_array($school_year_mode, array('preserve', 'replace'), true)) {
+            $school_year_mode = 'preserve';
+        }
+        $target_school_year = isset($_POST['target_school_year'])
+            ? sanitize_text_field(wp_unslash($_POST['target_school_year']))
+            : flz_ags_default_school_year();
+        $school_year = isset($_POST['school_year'])
+            ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_POST['school_year'])))
+            : flz_ags_current_school_year();
+        if (!$is_import) {
+            wp_die(esc_html__('Ungültige CSV-Aktion.', 'flz-ags'));
+        }
+
+        try {
+            $this->assert_course_csv_upload();
+            $parsed = FLZ_AGS_Course_CSV::parse_tolerant(
+                flz_wpdb_objects_read_uploaded_csv(
+                    'course-csv',
+                    'Einlesen der AG-/Slot-CSV-Datei',
+                    false
+                )
+            );
+            if ('replace' === $school_year_mode) {
+                $parsed = FLZ_AGS_Course_CSV::remap_school_year($parsed, $target_school_year);
+            }
+            $plan = null;
+            FLZ_AGS_Model::transaction(
+                function () use ($parsed, &$plan): void {
+                    $plan = $this->build_course_csv_import_plan($parsed['courses'], $parsed['warnings']);
+                    $this->apply_course_csv_import_plan($plan);
+                },
+                'Importieren von AGs und Terminen aus CSV'
+            );
+            if (!is_array($plan)) {
+                throw new RuntimeException('Der AG-CSV-Import konnte keinen Verarbeitungsbericht erstellen.');
+            }
+            $report = array(
+                'courses_created' => (int) $plan['courses_created'],
+                'courses_updated' => (int) $plan['courses_updated'],
+                'slots_created' => (int) $plan['slots_created'],
+                'slots_updated' => (int) $plan['slots_updated'],
+                'warnings' => array_values(array_map('strval', (array) $plan['warnings'])),
+                'school_year_note' => 'replace' === $school_year_mode
+                    ? 'Alle importierten AGs wurden dem Schuljahr ' . $target_school_year . ' zugeordnet.'
+                    : 'Die Schuljahre aus der CSV wurden beibehalten.',
+            );
+            set_transient($this->course_csv_report_key(), $report, 10 * MINUTE_IN_SECONDS);
+            flz_ags_safe_redirect(flz_ags_admin_url(array(
+                'page' => 'flz-ags',
+                'school_year' => 'replace' === $school_year_mode ? $target_school_year : $school_year,
+                'csv_imported' => 1,
+            )));
+        } catch (Throwable $error) {
+            if ($error instanceof UnexpectedValueException || $error instanceof InvalidArgumentException) {
+                set_transient($this->course_csv_notice_key(), $error->getMessage(), 5 * MINUTE_IN_SECONDS);
+            }
+            $this->redirect_admin_error(
+                $error,
+                'Prüfen oder Importieren der AG-/Slot-CSV-Datei',
+                'course-import',
+                array('page' => 'flz-ags', 'school_year' => $school_year)
+            );
+        }
+    }
+
+    /**
+     * @param array<string,array{course:array<string,mixed>,slots:array<int,array<string,mixed>>}> $courses
+     * @return array<string,mixed>
+     */
+    private function build_course_csv_import_plan(array $courses, array $warnings = array()): array
+    {
+        $existing_by_key = array();
+        $ambiguous_course_keys = array();
+        $years = array_values(array_unique(array_map(
+            static fn(array $item): string => (string) $item['course']['school_year'],
+            array_values($courses)
+        )));
+        foreach ($years as $year) {
+            foreach ($this->get_courses($year, false) as $existing_course) {
+                $key = FLZ_AGS_Course_CSV::course_key((string) $existing_course->school_year, (string) $existing_course->slug);
+                if (isset($existing_by_key[$key])) {
+                    unset($existing_by_key[$key]);
+                    $ambiguous_course_keys[$key] = true;
+                    continue;
+                }
+                if (!isset($ambiguous_course_keys[$key])) {
+                    $existing_by_key[$key] = $existing_course;
+                }
+            }
+        }
+
+        $plan = array(
+            'items' => array(),
+            'courses_created' => 0,
+            'courses_updated' => 0,
+            'slots_created' => 0,
+            'slots_updated' => 0,
+            'warnings' => $warnings,
+        );
+
+        foreach ($courses as $key => $item) {
+            if (isset($ambiguous_course_keys[$key])) {
+                $plan['warnings'][] = 'AG „' . $key . '“ wurde übersprungen: Im vorhandenen Bestand gibt es diesen Schlüssel mehrfach.';
+                continue;
+            }
+            $course_data = $item['course'];
+            $detail_page_path = (string) $course_data['detail_page_path'];
+            unset($course_data['detail_page_path']);
+            $detail_page = '' !== $detail_page_path ? get_page_by_path($detail_page_path, OBJECT, 'page') : null;
+            if ('' !== $detail_page_path && !$detail_page instanceof WP_Post) {
+                $plan['warnings'][] = 'AG „' . $key . '“ wurde ohne Detailseite importiert: Der Seitenpfad „' . $detail_page_path . '“ wurde nicht gefunden.';
+            }
+            try {
+                $detail_page_id = $detail_page instanceof WP_Post
+                    ? $this->validate_detail_page_id((int) $detail_page->ID)
+                    : 0;
+            } catch (UnexpectedValueException $error) {
+                $detail_page_id = 0;
+                $plan['warnings'][] = 'AG „' . $key . '“ wurde ohne Detailseite importiert: Die gefundene Seite ist nicht verwendbar.';
+            }
+            if (!empty($course_data['registration_open']) && $detail_page_id > 0 && get_post_status($detail_page_id) !== 'publish') {
+                $detail_page_id = 0;
+                $plan['warnings'][] = 'AG „' . $key . '“ wurde ohne Detailseite importiert: Die gefundene Seite ist nicht veröffentlicht.';
+            }
+            $course_data['detail_page_id'] = $detail_page_id;
+
+            $existing_course = $existing_by_key[$key] ?? null;
+            $existing_slots = $existing_course instanceof FLZ_AGS_Course
+                ? $this->get_course_slots((int) $existing_course->id, true)
+                : array();
+            $existing_slots_by_key = array();
+            $ambiguous_slot_keys = array();
+            foreach ($existing_slots as $existing_slot) {
+                $slot_key = $this->course_csv_slot_key($existing_slot);
+                if (isset($existing_slots_by_key[$slot_key])) {
+                    unset($existing_slots_by_key[$slot_key]);
+                    $ambiguous_slot_keys[$slot_key] = true;
+                    continue;
+                }
+                if (!isset($ambiguous_slot_keys[$slot_key])) {
+                    $existing_slots_by_key[$slot_key] = $existing_slot;
+                }
+            }
+
+            $slot_plans = array();
+            foreach ($item['slots'] as $slot_data) {
+                $slot_key = $this->course_csv_slot_key($slot_data);
+                if (isset($ambiguous_slot_keys[$slot_key])) {
+                    $plan['warnings'][] = 'Ein Termin der AG „' . $key . '“ wurde übersprungen: Im vorhandenen Bestand gibt es Wochentag, Zeiten und Raum mehrfach.';
+                    continue;
+                }
+                $existing_slot = $existing_slots_by_key[$slot_key] ?? null;
+                $slot_plans[] = array('data' => $slot_data, 'existing' => $existing_slot);
+                $existing_slot instanceof FLZ_AGS_Slot ? ++$plan['slots_updated'] : ++$plan['slots_created'];
+            }
+
+            $existing_course instanceof FLZ_AGS_Course ? ++$plan['courses_updated'] : ++$plan['courses_created'];
+            $plan['items'][] = array(
+                'data' => $course_data,
+                'existing' => $existing_course,
+                'slots' => $slot_plans,
+            );
+        }
+
+        return $plan;
+    }
+
+    /**
+     * @param array<string,mixed> $plan
+     */
+    private function apply_course_csv_import_plan(array $plan): void
+    {
+        $now = current_time('mysql');
+        foreach ($plan['items'] as $item) {
+            $course = $item['existing'] instanceof FLZ_AGS_Course ? $item['existing'] : new FLZ_AGS_Course();
+            foreach ($item['data'] as $property => $value) {
+                $course->{$property} = $value;
+            }
+            $course->updated_at = $now;
+            if ($course->created_at === null) {
+                $course->created_at = $now;
+            }
+            $course->save();
+
+            foreach ($item['slots'] as $slot_item) {
+                $slot = $slot_item['existing'] instanceof FLZ_AGS_Slot ? $slot_item['existing'] : new FLZ_AGS_Slot();
+                foreach ($slot_item['data'] as $property => $value) {
+                    $slot->{$property} = $value;
+                }
+                $slot->course_id = (int) $course->id;
+                $slot->school_year = (string) $course->school_year;
+                $slot->updated_at = $now;
+                if ($slot->created_at === null) {
+                    $slot->created_at = $now;
+                }
+                $slot->save();
+            }
+        }
+    }
+
+    private function course_csv_slot_key($slot): string
+    {
+        $value = static function ($source, string $field) {
+            return is_array($source) ? ($source[$field] ?? '') : ($source->{$field} ?? '');
+        };
+        return implode('|', array(
+            (int) $value($slot, 'weekday'),
+            (string) $value($slot, 'start_time'),
+            (string) $value($slot, 'end_time'),
+            strtolower((string) $value($slot, 'room')),
+        ));
+    }
+
+    private function course_csv_notice_key(): string
+    {
+        return 'flz_ags_course_csv_notice_' . get_current_user_id();
+    }
+
+    private function assert_course_csv_upload(): void
+    {
+        // Nonce und Berechtigung wurden im aufrufenden Admin-Handler bereits geprüft.
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- PHP stellt Fehlercode und temporären Uploadpfad bereit; gelesen wird die Datei anschließend durch den zentralen CSV-Helper.
+        $upload_error = isset($_FILES['course-csv']['error']) ? (int) $_FILES['course-csv']['error'] : UPLOAD_ERR_NO_FILE;
+        if (UPLOAD_ERR_OK === $upload_error) {
+            return;
+        }
+
+        $messages = array(
+            UPLOAD_ERR_INI_SIZE => 'Die CSV-Datei ist größer als die serverseitig erlaubte Uploadgröße.',
+            UPLOAD_ERR_FORM_SIZE => 'Die CSV-Datei ist größer als die im Formular erlaubte Uploadgröße.',
+            UPLOAD_ERR_PARTIAL => 'Die CSV-Datei wurde nur teilweise hochgeladen. Bitte erneut versuchen.',
+            UPLOAD_ERR_NO_FILE => 'Bitte zuerst eine CSV-Datei auswählen.',
+            UPLOAD_ERR_NO_TMP_DIR => 'Der Server kann derzeit keine Uploads zwischenspeichern.',
+            UPLOAD_ERR_CANT_WRITE => 'Der Server konnte die hochgeladene CSV-Datei nicht zwischenspeichern.',
+            UPLOAD_ERR_EXTENSION => 'Der CSV-Upload wurde durch eine Servererweiterung abgebrochen.',
+        );
+        throw new UnexpectedValueException($messages[$upload_error] ?? 'Der CSV-Upload ist mit einem unbekannten Fehler fehlgeschlagen.');
+    }
+
+    private function course_csv_report_key(): string
+    {
+        return 'flz_ags_course_csv_report_' . get_current_user_id();
+    }
+
+    public function handle_delete_old_registrations(): void
+    {
+        $this->assert_admin_permission();
+        check_admin_referer('flz_ags_delete_old_registrations');
+        if (!isset($_POST['confirm_delete_old_registrations'])) {
+            wp_die(esc_html__('Bitte bestätigen Sie die dauerhafte Löschung alter Anmeldungen.', 'flz-ags'));
+        }
+
+        try {
+            $deleted = FLZ_AGS_Model::transaction(
+                fn(): int => $this->delete_registrations_before(flz_ags_registration_retention_cutoff()),
+                'Manuelles Löschen alter AG-Anmeldungen'
+            );
+        } catch (Throwable $error) {
+            $this->redirect_admin_error(
+                $error,
+                'Manuelles Löschen alter AG-Anmeldungen',
+                'delete-old-registrations',
+                array('page' => 'flz-ags-settings')
+            );
+        }
+
+        flz_ags_safe_redirect(flz_ags_admin_url(array('page' => 'flz-ags-settings', 'deleted' => $deleted)));
+    }
+
+    public function handle_scheduled_registration_cleanup(): void
+    {
+        if (!(bool) get_option('flz_ags_registration_retention_enabled', 0)) {
+            return;
+        }
+        try {
+            FLZ_AGS_Model::transaction(
+                fn(): int => $this->delete_registrations_before(flz_ags_registration_retention_cutoff()),
+                'Automatisches Löschen alter AG-Anmeldungen'
+            );
+        } catch (Throwable $error) {
+            flz_ags_log_error($error, 'Automatisches Löschen alter AG-Anmeldungen');
+        }
+    }
+
+    private function delete_registrations_before(string $cutoff): int
+    {
+        $deleted = 0;
+        foreach (FLZ_AGS_Registration::find_created_before($cutoff) as $registration) {
+            $deleted += $registration->delete();
+        }
+        return $deleted;
+    }
+
+    /**
+     * Stellt möglichst viele Anmeldungen aus einem portablen Backup wieder her.
+     * Nicht auflösbare Referenzen werden ausgelassen; der akzeptierte Teil wird atomar gespeichert.
+     */
+    public function handle_import_registrations_csv(): void
+    {
+        $this->assert_admin_permission();
+        check_admin_referer('flz_ags_import_registrations_csv');
+        $school_year = isset($_POST['school_year'])
+            ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_POST['school_year'])))
+            : flz_ags_current_school_year();
+        if (!isset($_POST['confirm_registration_import'])) {
+            wp_die(esc_html__('Bitte bestätigen Sie, dass die CSV personenbezogene Anmeldungsdaten enthält.', 'flz-ags'));
+        }
+
+        try {
+            $this->assert_registration_csv_upload();
+            $parsed = FLZ_AGS_Registration_CSV::parse_tolerant(
+                flz_wpdb_objects_read_uploaded_csv(
+                    'registration-csv',
+                    'Einlesen des Anmeldungs-Backups',
+                    false
+                )
+            );
+            $report = FLZ_AGS_Model::transaction(
+                fn(): array => $this->apply_registration_csv_import($parsed),
+                'Importieren von AG-Anmeldungen aus CSV'
+            );
+            set_transient($this->registration_csv_report_key(), $report, 10 * MINUTE_IN_SECONDS);
+            flz_ags_safe_redirect(flz_ags_admin_url(array(
+                'page' => 'flz-ags-registrations',
+                'school_year' => $school_year,
+                'csv_imported' => 1,
+            )));
+        } catch (Throwable $error) {
+            if ($error instanceof UnexpectedValueException || $error instanceof InvalidArgumentException) {
+                set_transient($this->registration_csv_report_key(), array(
+                    'created' => 0,
+                    'updated' => 0,
+                    'skipped' => 0,
+                    'warnings' => array($error->getMessage()),
+                    'error' => true,
+                ), 10 * MINUTE_IN_SECONDS);
+            }
+            $this->redirect_admin_error(
+                $error,
+                'Importieren des Anmeldungs-Backups',
+                'registration-import',
+                array('page' => 'flz-ags-registrations', 'school_year' => $school_year)
+            );
+        }
+    }
+
+    /** @param array{registrations:array<int,array<string,mixed>>,warnings:array<int,string>} $parsed */
+    private function apply_registration_csv_import(array $parsed): array
+    {
+        $report = array(
+            'created' => 0,
+            'updated' => 0,
+            'skipped' => 0,
+            'warnings' => array_values(array_map('strval', $parsed['warnings'])),
+        );
+        $now = current_time('mysql');
+
+        foreach ($parsed['registrations'] as $data) {
+            $line = (int) $data['source_line'];
+            try {
+                $course = FLZ_AGS_Course::find_by_school_year_and_slug(
+                    (string) $data['school_year'],
+                    sanitize_title((string) $data['course_slug'])
+                );
+                if (!$course instanceof FLZ_AGS_Course) {
+                    ++$report['skipped'];
+                    $report['warnings'][] = 'Zeile ' . $line . ' wurde übersprungen: Die AG „' . $data['course_slug'] . '“ existiert in ' . $data['school_year'] . ' nicht.';
+                    continue;
+                }
+                $slot = FLZ_AGS_Slot::find_for_backup_reference(
+                    (int) $course->id,
+                    (string) $data['school_year'],
+                    (int) $data['slot_weekday'],
+                    (string) $data['slot_start_time'],
+                    (string) $data['slot_end_time'],
+                    sanitize_text_field((string) $data['slot_room'])
+                );
+                if (!$slot instanceof FLZ_AGS_Slot) {
+                    ++$report['skipped'];
+                    $report['warnings'][] = 'Zeile ' . $line . ' wurde übersprungen: Der zugehörige Termin der AG „' . $course->title . '“ wurde nicht gefunden.';
+                    continue;
+                }
+
+                $record = array(
+                    'course_id' => (int) $course->id,
+                    'slot_id' => (int) $slot->id,
+                    'school_year' => (string) $data['school_year'],
+                    'class_name' => sanitize_text_field((string) $data['class_name']),
+                    'grade_key' => sanitize_key((string) $data['grade_key']),
+                    'student_first_name' => sanitize_text_field((string) $data['student_first_name']),
+                    'student_last_name' => sanitize_text_field((string) $data['student_last_name']),
+                    'student_email' => sanitize_email((string) $data['student_email']),
+                    'status' => sanitize_key((string) $data['status']),
+                    'withdrawn_at' => '' !== $data['withdrawn_at'] ? (string) $data['withdrawn_at'] : null,
+                    'withdrawn_reason' => sanitize_textarea_field((string) $data['withdrawn_reason']),
+                    'consent_privacy' => (int) $data['consent_privacy'],
+                    'created_at' => '' !== $data['created_at'] ? (string) $data['created_at'] : $now,
+                    'updated_at' => '' !== $data['updated_at'] ? (string) $data['updated_at'] : $now,
+                );
+                $existing = FLZ_AGS_Registration::find_backup_match($record);
+                if ('active' === $record['status']) {
+                    $active = FLZ_AGS_Registration::find_active_for_student(
+                        $record['school_year'],
+                        $record['class_name'],
+                        $record['student_first_name'],
+                        $record['student_last_name']
+                    );
+                    if ($active instanceof FLZ_AGS_Registration && (!$existing instanceof FLZ_AGS_Registration || $active->id !== $existing->id)) {
+                        ++$report['skipped'];
+                        $report['warnings'][] = 'Zeile ' . $line . ' wurde übersprungen: Für diese Schüler*in besteht bereits eine andere aktive Anmeldung im Schuljahr.';
+                        continue;
+                    }
+                }
+
+                $registration = $existing instanceof FLZ_AGS_Registration ? $existing : new FLZ_AGS_Registration();
+                foreach ($record as $property => $value) {
+                    $registration->{$property} = $value;
+                }
+                $registration->save();
+                $existing instanceof FLZ_AGS_Registration ? ++$report['updated'] : ++$report['created'];
+            } catch (UnexpectedValueException $error) {
+                ++$report['skipped'];
+                $report['warnings'][] = 'Zeile ' . $line . ' wurde übersprungen: ' . $error->getMessage();
+            }
+        }
+        return $report;
+    }
+
+    private function assert_registration_csv_upload(): void
+    {
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Fehlercode und temporärer Uploadpfad stammen von PHP; der zentrale CSV-Helper liest die Datei.
+        $upload_error = isset($_FILES['registration-csv']['error']) ? (int) $_FILES['registration-csv']['error'] : UPLOAD_ERR_NO_FILE;
+        if (UPLOAD_ERR_OK === $upload_error) {
+            return;
+        }
+        $messages = array(
+            UPLOAD_ERR_INI_SIZE => 'Die Anmeldungs-CSV ist größer als die serverseitig erlaubte Uploadgröße.',
+            UPLOAD_ERR_FORM_SIZE => 'Die Anmeldungs-CSV ist größer als die im Formular erlaubte Uploadgröße.',
+            UPLOAD_ERR_PARTIAL => 'Die Anmeldungs-CSV wurde nur teilweise hochgeladen. Bitte erneut versuchen.',
+            UPLOAD_ERR_NO_FILE => 'Bitte zuerst eine Anmeldungs-CSV auswählen.',
+            UPLOAD_ERR_NO_TMP_DIR => 'Der Server kann derzeit keine Uploads zwischenspeichern.',
+            UPLOAD_ERR_CANT_WRITE => 'Der Server konnte die hochgeladene CSV-Datei nicht zwischenspeichern.',
+            UPLOAD_ERR_EXTENSION => 'Der CSV-Upload wurde durch eine Servererweiterung abgebrochen.',
+        );
+        throw new UnexpectedValueException($messages[$upload_error] ?? 'Der Anmeldungs-CSV-Upload ist mit einem unbekannten Fehler fehlgeschlagen.');
+    }
+
+    private function registration_csv_report_key(): string
+    {
+        return 'flz_ags_registration_csv_report_' . get_current_user_id();
+    }
+
     public function handle_export_csv(): void
     {
         $this->assert_admin_permission();
         check_admin_referer('flz_ags_export_csv');
 
         $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_GET['school_year']))) : flz_ags_current_school_year();
-        $status = isset($_GET['status']) ? sanitize_key(wp_unslash($_GET['status'])) : 'active';
-        if (!array_key_exists($status, flz_ags_status_labels())) {
-            $status = 'active';
-        }
 
         try {
-            $rows = FLZ_AGS_Registration::find_for_admin($school_year, $status, true);
-            $csv_rows = array();
-            foreach ($rows as $row) {
-                $csv_rows[] = array(
-                    $row->school_year,
-                    flz_ags_status_label($row->status),
-                    flz_ags_class_label((string) $row->class_name),
-                    $row->grade_key,
-                    $row->student_last_name,
-                    $row->student_first_name,
-                    $row->student_email,
-                    $row->title,
-                    flz_ags_weekday_label($row->weekday),
-                    flz_ags_format_time($row->start_time),
-                    flz_ags_format_time($row->end_time),
-                    $row->room,
-                    flz_ui_format_datetime($row->created_at, (string) $row->created_at),
-                );
-            }
+            $rows = FLZ_AGS_Registration::find_for_admin($school_year, 'all', true);
             flz_wpdb_objects_send_csv_download(
-                array('Schuljahr', 'Status', 'Klasse', 'Jahrgangsschlüssel', 'Nachname', 'Vorname', 'E-Mail Schüler*in', 'AG', 'Wochentag', 'Beginn', 'Ende', 'Raum', 'Anmeldedatum'),
-                $csv_rows,
-                'flz-ag-anmeldungen-' . sanitize_file_name($school_year) . '-' . sanitize_file_name($status) . '.csv'
+                FLZ_AGS_Registration_CSV::header(),
+                FLZ_AGS_Registration_CSV::export_rows($rows),
+                'flz-ag-anmeldungen-backup-' . sanitize_file_name($school_year) . '.csv'
             );
         } catch (Throwable $error) {
             $this->redirect_admin_error(
                 $error,
                 'Erstellen des AG-CSV-Exports',
                 'export',
-                array('page' => 'flz-ags-registrations', 'school_year' => $school_year, 'status' => $status)
+                array('page' => 'flz-ags-registrations', 'school_year' => $school_year)
             );
         }
     }

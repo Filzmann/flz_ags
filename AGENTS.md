@@ -15,8 +15,12 @@ anderer Repositories werden nie direkt eingebunden.
 - Kapazitäts- und Eindeutigkeitsprüfung samt Insert sind atomar.
 - Deaktivierung löscht keine Daten. Schema-Upgrades sind versioniert und
   idempotent.
-- AGs/Slots und Anmeldungen besitzen jeweils versionierten CSV-Import und
-  -Export mit Dry-Run; Exporte werden geschützt direkt gestreamt.
+- AGs/Slots besitzen einen versionierten, fehlertoleranten CSV-Direktimport mit
+  zeilenbezogenem Bericht und wählbarer Schuljahrübernahme. Exporte werden
+  geschützt direkt gestreamt und können Slots optional einschließen.
+  Personenbezogene Anmeldungen verwenden ebenfalls einen direkten,
+  ausdrücklich bestätigten und atomaren Backup-Import ohne Mailversand; nicht
+  auflösbare Einzelzeilen werden datensparsam und verständlich gemeldet.
 - Aufbewahrung, Auskunft, Anonymisierung und Löschung sind dokumentiert und
   testbar. Logs und lokale Mail-Captures sind datensparsam und kurzlebig.
 - Übersetzbare Texte verwenden `flz-ags`.

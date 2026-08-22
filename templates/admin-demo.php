@@ -4,7 +4,7 @@ defined('ABSPATH') || exit;
 
 $ui = flz_ui();
 ?>
-<p>Legt aus den vorhandenen AG-Unterseiten Demo-Datensätze für das gewählte Schuljahr an. Vorhandene AGs mit gleichem Slug und Schuljahr werden nicht dupliziert.</p>
+<p>Legt klar synthetische Demo-Datensätze für das gewählte Schuljahr an. Aus den vorhandenen AG-Unterseiten werden nur Seitenbezug, Jahrgänge und Terminstruktur verwendet; Namen, Bilder und redaktionelle Freitexte werden nicht übernommen.</p>
 
 <?php echo $ui->form_start(array('method' => 'get', 'class' => 'flz-ags-admin-filter', 'hidden' => array('page' => 'flz-ags-demo'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formular. ?>
 	<?php echo $ui->input('text', array('name' => 'school_year', 'label' => 'Schuljahr', 'value' => $school_year)); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
@@ -17,7 +17,7 @@ $ui = flz_ui();
 <?php endif; ?>
 
 <?php echo $ui->form_start(array('method' => 'post', 'action' => admin_url('admin-post.php'), 'nonce' => 'flz_ags_install_demo', 'hidden' => array('action' => 'flz_ags_install_demo', 'school_year' => $school_year))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formular. ?>
-	<p><?php echo $ui->button_new(array('label' => 'Demo-AGs für ' . $school_year . ' aus AG-Seiten anlegen', 'type' => 'submit')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?></p>
+	<p><?php echo $ui->button_new(array('label' => 'Synthetische Demo-AGs für ' . $school_year . ' anlegen', 'type' => 'submit')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?></p>
 <?php echo $ui->form_end(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formularende. ?>
 
 <h2>Enthaltene Demo-AGs</h2>

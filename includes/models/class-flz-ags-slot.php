@@ -73,6 +73,29 @@ class FLZ_AGS_Slot extends FLZ_AGS_Model
         return static::query_models($sql, array($course_id), 'Laden der Termine einer AG');
     }
 
+    public static function find_for_backup_reference(
+        int $course_id,
+        string $school_year,
+        int $weekday,
+        string $start_time,
+        string $end_time,
+        string $room
+    ): ?self {
+        $sql = 'SELECT * FROM ' . static::table_name()
+            . ' WHERE course_id = %d AND school_year = %s AND weekday = %d'
+            . ' AND start_time = %s AND end_time = %s AND COALESCE(room, \'\') = %s'
+            . ' ORDER BY id ASC LIMIT 2';
+        $models = static::query_models(
+            $sql,
+            array($course_id, $school_year, $weekday, $start_time, $end_time, $room),
+            'Auflösen eines Termins für den Anmeldungs-Import'
+        );
+        if (count($models) > 1) {
+            throw new UnexpectedValueException('Der AG-Termin ist nicht eindeutig.');
+        }
+        return $models[0] ?? null;
+    }
+
     public static function find_with_course(int $slot_id, bool $for_update = false): ?self
     {
         $sql = 'SELECT s.*, c.title, c.allowed_grades, c.only_grade_7, c.registration_open, c.detail_page_id, '

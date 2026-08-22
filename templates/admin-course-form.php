@@ -88,7 +88,7 @@ $admin_detail_page_row = static function (?object $course) use ($admin_page_pick
         $detail_page_id,
         'Keine Detailseite ausgewählt.',
         'AG-Detailseite suchen',
-        'Die Anmeldung wird automatisch auf dieser AG-Detailseite angezeigt. Neue Detailseiten werden als Unterseite der eingestellten AG-Hauptseite veröffentlicht.',
+        'Optional. Die Anmeldung wird automatisch auf dieser AG-Detailseite angezeigt. Neue Detailseiten werden als Unterseite der eingestellten AG-Hauptseite veröffentlicht.',
         true,
         'Neue Detailseite anlegen',
         '#title'
@@ -179,5 +179,8 @@ if (empty($slot_rows)) {
 	));
 	// phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
 	?>
-	<p><?php echo $ui->button_save(array('label' => 'AG speichern')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?></p>
+	<p>
+		<?php echo $ui->button_save(array('label' => 'AG speichern')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+		<?php echo $ui->button_save(array('label' => 'Speichern und neu', 'class' => 'flz-ags-save-and-new', 'type' => 'submit', 'attrs' => array('name' => 'save_and_new', 'value' => '1'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+	</p>
 <?php echo $ui->form_end(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formularende. ?>
