@@ -3,20 +3,18 @@
 ## Prüfstatus
 
 **Funktionsstand 0.6.0 ohne offene P0-/P1-Befunde; Release-Gate in
-Übernahmephase 1 blockiert.** Admin-/AJAX-
+Übernahmephase 2 blockiert.** Admin-/AJAX-
 Pfade prüfen Capability und Nonce, CSV wird direkt gestreamt, Kapazität unter
 Slot-Sperre geprüft und aktive Mehrfachanmeldung durch einen eindeutigen
 Datenbankvertrag verhindert. Datenschutz, kurzlebige Mail-Capture-Diagnose und
 DB-Upgrade sind umgesetzt. Fast-Checks, reale lokale Bestandsmigration und
-Aktivieren–Deaktivieren–Aktivieren sind grün. PR-/Main-CI mit branchgleichen
-Shared-Plugins ist lokal konfiguriert; vor einem Tag fehlen ein grüner
-Remote-Lauf, getrennte PHP-/JavaScript-No-Regression-Coverage, ausgefüllte
-Browser-/Mail-/Zwei-Prozess-Abnahme und ein reproduzierbar geprüftes
-Release-Artefakt. Das Protokoll liegt unter `docs/manual-acceptance.md`.
-
-Die lokal reproduzierte JavaScript-Line-Coverage beträgt 41,46 Prozent und ist
-als No-Regression-Ratsche konfiguriert; das Ziel bleibt 85 Prozent. Der
-PHPCOV-/Xdebug-Job ist vorbereitet, die PHP-Baseline wartet auf den Remote-Lauf.
+Aktivieren–Deaktivieren–Aktivieren sind grün. PR-/Main-CI, branchgleiche
+Shared-Plugins und die Ratschen von 16,34 Prozent PHP sowie 41,46 Prozent
+JavaScript sind remote enforced; Ziel bleiben je 85 Prozent. Der
+reproduzierbare ZIP-Builder ist konfiguriert. Vor einem Tag fehlen die
+schrittweise Zielannäherung, die Browser-/Mail-/Zwei-Prozess-Abnahme sowie
+Installation, Upgrade und Rückbau aus dem exakten Artefakt. Das Protokoll liegt
+unter `docs/manual-acceptance.md`.
 
 ## P1
 

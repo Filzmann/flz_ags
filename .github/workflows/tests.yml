@@ -169,3 +169,31 @@ jobs:
             flz_ags \
             "$GITHUB_WORKSPACE/tagore-plugins/tests/coverage/node_modules/.bin/c8" \
             "$RUNNER_TEMP/js-coverage"
+
+  release:
+    name: Release-Artefakt
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Plugin auschecken
+        uses: actions/checkout@v7
+        with:
+          path: flz_ags
+      - name: Quality-Workspace-Referenz bestimmen
+        id: release-quality-ref
+        env:
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/Filzmann/tagore-plugins.git "refs/heads/$CANDIDATE_REF" >/dev/null 2>&1; then
+            echo "ref=$CANDIDATE_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Quality-Workspace auschecken
+        uses: actions/checkout@v7
+        with:
+          repository: Filzmann/tagore-plugins
+          ref: ${{ steps.release-quality-ref.outputs.ref }}
+          path: tagore-plugins
+      - name: Reproduzierbares Release-Artefakt prüfen
+        run: tagore-plugins/scripts/verify-component-release flz_ags flz_ags "$RUNNER_TEMP/release-verification"

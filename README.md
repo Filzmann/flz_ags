@@ -2,10 +2,17 @@
 
 Initiale WordPress-Plugin-Version für AG-Verwaltung und AG-Anmeldung.
 
-Der BR-starke Commit-/Coverage-/Releasevertrag wird schrittweise übernommen;
-bis zum grünen lokalen Gate bleibt ein Release blockiert. Das ausfüllbare
+Commit-, CI- und Coverage-Gates sind in Übernahmephase 2 enforced. Ein Release
+bleibt bis zur ausgefüllten Abnahme sowie zur Installation, zum Upgrade und
+zum Rückbau aus dem exakten Artefakt blockiert. Das ausfüllbare
 [Abnahmeprotokoll](docs/manual-acceptance.md) führt Installation, Upgrade,
 Nebenläufigkeit, CSV, Datenschutz, Mail, Oberfläche und Rückbau zusammen.
+
+Ein sauberer Commit wird reproduzierbar paketiert mit:
+
+```bash
+./scripts/build-release /tmp/flz_ags-release
+```
 
 ## Neu in 0.6.0
 

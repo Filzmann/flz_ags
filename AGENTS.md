@@ -48,6 +48,9 @@ ohne ausdrückliche Freigabe; nie `git add .` verwenden.
 - Die enforced Baselines betragen 16,34 Prozent für PHP und 41,46 Prozent für
   JavaScript; das Ziel für neuen oder wesentlich geänderten Code bleibt je
   Sprache 85 Prozent.
+- `scripts/build-release` erzeugt über den kanonischen Workspace-Builder ein
+  reproduzierbares Ein-Wurzel-ZIP mit Manifest und SHA-256. Das Artefakt-Gate
+  bleibt bis zur Prüfung des exakten ZIP in WordPress `configured`.
 - Ein Fast- oder Diagnosecheck ist kein Releaseurteil. Ein Release braucht ein
   sauberes Repository, konsistente Version/Changelog/Lizenz, vollständig
   ausgefülltes `docs/manual-acceptance.md`, ein reproduzierbares Ein-Wurzel-
