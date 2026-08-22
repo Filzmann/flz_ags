@@ -11,7 +11,7 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 - Branchgleicher Checkout beider Shared-Plugins mit sicherem `main`-Fallback
   ergänzt.
 - Formale Lizenz- und Abnahmenachweise in den Delivery-Vertrag aufgenommen.
-- PHP-/JavaScript-No-Regression-Ratschen bei 16,34 beziehungsweise
+- PHP-/JavaScript-No-Regression-Ratschen bei 16,47 beziehungsweise
   41,46 Prozent remote enforced.
 - Reproduzierbaren Ein-Wurzel-ZIP-Bau mit Manifest, SHA-256 und CI-Prüfung
   ergänzt.

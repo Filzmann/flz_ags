@@ -9,7 +9,7 @@ Slot-Sperre geprüft und aktive Mehrfachanmeldung durch einen eindeutigen
 Datenbankvertrag verhindert. Datenschutz, kurzlebige Mail-Capture-Diagnose und
 DB-Upgrade sind umgesetzt. Fast-Checks, reale lokale Bestandsmigration und
 Aktivieren–Deaktivieren–Aktivieren sind grün. PR-/Main-CI, branchgleiche
-Shared-Plugins und die Ratschen von 16,34 Prozent PHP sowie 41,46 Prozent
+Shared-Plugins und die Ratschen von 16,47 Prozent PHP sowie 41,46 Prozent
 JavaScript sind remote enforced; Ziel bleiben je 85 Prozent. Der
 reproduzierbare ZIP-Builder ist konfiguriert. Vor einem Tag fehlen die
 schrittweise Zielannäherung, die Browser-/Mail-/Zwei-Prozess-Abnahme sowie

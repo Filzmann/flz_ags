@@ -45,7 +45,7 @@ ohne ausdrückliche Freigabe; nie `git add .` verwenden.
   No-Regression-Baselines geprüft. Neuer oder wesentlich geänderter Code
   erreicht mindestens 85 Prozent; Sicherheits-, Datenschutz-, Migrations- und
   Nebenläufigkeitsinvarianten sind unabhängig davon vollständig abgedeckt.
-- Die enforced Baselines betragen 16,34 Prozent für PHP und 41,46 Prozent für
+- Die enforced Baselines betragen 16,47 Prozent für PHP und 41,46 Prozent für
   JavaScript; das Ziel für neuen oder wesentlich geänderten Code bleibt je
   Sprache 85 Prozent.
 - `scripts/build-release` erzeugt über den kanonischen Workspace-Builder ein
