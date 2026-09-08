@@ -11,6 +11,13 @@ $filter_attrs = is_array($filter_attrs ?? null) ? $filter_attrs : array();
 	data-only-grade-7="<?php echo esc_attr((string) ($filter_attrs['data-only-grade-7'] ?? '0')); ?>"
 	data-allowed-grades="<?php echo esc_attr((string) ($filter_attrs['data-allowed-grades'] ?? '')); ?>"
 	data-full="<?php echo esc_attr((string) ($filter_attrs['data-full'] ?? '0')); ?>"
+	data-leader="<?php echo esc_attr((string) ($filter_attrs['data-leader'] ?? '')); ?>"
+	data-search="<?php echo esc_attr((string) ($filter_attrs['data-search'] ?? '')); ?>"
+	data-sort-default="<?php echo esc_attr((string) ($filter_attrs['data-sort-default'] ?? '0')); ?>"
+	data-sort-title="<?php echo esc_attr((string) ($filter_attrs['data-sort-title'] ?? '')); ?>"
+	data-sort-grade="<?php echo esc_attr((string) ($filter_attrs['data-sort-grade'] ?? '0')); ?>"
+	data-sort-leader="<?php echo esc_attr((string) ($filter_attrs['data-sort-leader'] ?? '')); ?>"
+	data-sort-weekday="<?php echo esc_attr((string) ($filter_attrs['data-sort-weekday'] ?? '99')); ?>"
 >
 	<?php echo flz_ui()->card($card_args); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die öffentliche AG-Karte. ?>
 	<?php if ((string) $registration_panel_html !== '') : ?>

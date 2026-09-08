@@ -3,7 +3,16 @@
 defined('ABSPATH') || exit;
 
 $ui = flz_ui();
+$leader_options = array();
+foreach ((array) $courses as $course_option) {
+	$leader_option = trim((string) ($course_option->leader_name ?? ''));
+	if ($leader_option !== '') {
+		$leader_options[$leader_option] = $leader_option;
+	}
+}
+natcasesort($leader_options);
 ?>
+<div data-flz-ags-admin-list>
 <div class="flz-ags-admin-toolbar">
 	<div class="flz-ags-admin-toolbar__actions">
 		<?php echo $ui->button_new(array('href' => flz_ags_admin_url(array('page' => 'flz-ags', 'action' => 'new')), 'label' => 'Neue AG anlegen')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
@@ -89,6 +98,15 @@ $ui = flz_ui();
 	<?php echo $ui->form_end(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formularende. ?>
 </div>
 
+<div class="flz-ags-admin-list-controls" aria-label="AG-Liste durchsuchen, filtern und sortieren">
+	<?php echo $ui->input('search', array('name' => 'course_search', 'label' => 'Suche', 'placeholder' => 'AG, Dozent, Bereich …', 'attrs' => array('data-flz-ags-admin-search' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+	<?php echo $ui->field(array('type' => 'select', 'name' => 'grade_filter', 'label' => 'Klassenstufe', 'placeholder' => 'alle Klassenstufen', 'options' => flz_ags_grade_options(), 'attrs' => array('data-flz-ags-admin-grade' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+	<?php echo $ui->field(array('type' => 'select', 'name' => 'leader_filter', 'label' => 'Dozent', 'placeholder' => 'alle Dozenten', 'options' => $leader_options, 'attrs' => array('data-flz-ags-admin-leader' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+	<?php echo $ui->field(array('type' => 'select', 'name' => 'weekday_filter', 'label' => 'Wochentag', 'placeholder' => 'alle Tage', 'options' => flz_ags_weekdays(), 'attrs' => array('data-flz-ags-admin-weekday' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+	<?php echo $ui->field(array('type' => 'select', 'name' => 'course_sort', 'label' => 'Sortierung', 'options' => array('default' => 'Vorgabe', 'title' => 'AG-Name', 'grade' => 'Klassenstufe', 'leader' => 'Dozent', 'weekday' => 'Wochentag'), 'attrs' => array('data-flz-ags-admin-sort' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+</div>
+<p class="screen-reader-text" aria-live="polite" data-flz-ags-admin-results-status></p>
+
 <?php $csv_warnings = is_array($csv_report) ? (array) ($csv_report['warnings'] ?? array()) : array(); ?>
 <?php if (!empty($csv_warnings)) : ?>
 	<section class="notice notice-warning inline flz-ags-csv-report" aria-labelledby="flz-ags-csv-report-title">
@@ -114,7 +132,7 @@ $ui = flz_ui();
 			<th></th>
 		</tr>
 	</thead>
-	<tbody>
+	<tbody data-flz-ags-admin-items>
 	<?php if (empty($courses)) : ?>
 		<tr><td colspan="7">Keine AGs für dieses Schuljahr angelegt.</td></tr>
 	<?php endif; ?>
@@ -126,6 +144,12 @@ $ui = flz_ui();
 			$slot_labels[] = flz_ags_weekday_label($slot->weekday) . ', ' . flz_ags_format_time($slot->start_time) . '–' . flz_ags_format_time($slot->end_time) . ($slot->room ? ', ' . $slot->room : '');
 		}
 		$target = $course->only_grade_7 ? 'nur Klasse 7' : flz_ags_allowed_grades_label((string) $course->allowed_grades);
+		$weekdays = array_values(array_unique(array_map(static fn($slot): int => (int) $slot->weekday, $slots)));
+		$allowed_grades = flz_ags_sanitize_allowed_grades((string) $course->allowed_grades);
+		$grade_keys = $allowed_grades !== '' ? array_map('intval', explode(',', $allowed_grades)) : array();
+		$sort_grade = !empty($course->only_grade_7) ? 7 : (!empty($grade_keys) ? min($grade_keys) : 0);
+		$sort_weekday = !empty($weekdays) ? min($weekdays) : 99;
+		$search_text = implode(' ', array((string) $course->title, (string) $course->category, (string) $course->leader_name, (string) $course->short_description, $target, implode(' ', $slot_labels)));
 		$status = array(
 			$course->is_active ? 'aktiv' : 'inaktiv',
 			$course->is_visible ? 'sichtbar' : 'versteckt',
@@ -137,6 +161,19 @@ $ui = flz_ui();
 		));
 		$quick_edit_row = $ui->editable_row(array(
 			'id'   => 'flz-ags-course-' . (int) $course->id,
+			'attrs' => array(
+				'data-flz-ags-admin-item' => true,
+				'data-allowed-grades' => (string) $course->allowed_grades,
+				'data-only-grade-7' => (int) $course->only_grade_7,
+				'data-weekdays' => implode(',', $weekdays),
+				'data-leader' => (string) $course->leader_name,
+				'data-search' => $search_text,
+				'data-sort-default' => (int) $course->sort_order,
+				'data-sort-title' => (string) $course->title,
+				'data-sort-grade' => $sort_grade,
+				'data-sort-leader' => (string) $course->leader_name,
+				'data-sort-weekday' => $sort_weekday,
+			),
 			'form' => array(
 				'method' => 'post',
 				'action' => esc_url(admin_url('admin-post.php')),
@@ -238,5 +275,7 @@ $ui = flz_ui();
 		?>
 		<?php echo $quick_edit_row; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Der Renderer escaped Zellen, Formular, Nonce und Felder. ?>
 	<?php endforeach; ?>
+	<tr data-flz-ags-admin-no-results hidden><td colspan="7">Keine AG entspricht den gewählten Filtern.</td></tr>
 	</tbody>
 </table>
+</div>

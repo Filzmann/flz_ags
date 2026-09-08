@@ -28,10 +28,11 @@ function flz_ags_get_frontend_template(string $template, array $vars = array()):
 /**
  * Rendert die öffentlichen Filter für Listen oder Anmeldeformular.
  */
-function flz_ags_render_frontend_filters(bool $include_classes): void
+function flz_ags_render_frontend_filters(bool $include_classes, array $courses = array()): void
 {
     flz_ags_render_frontend_template('filters', array(
         'include_classes' => $include_classes,
+        'courses' => $courses,
     ));
 }
 
@@ -105,6 +106,18 @@ function flz_ags_course_card_args(object $course): array
     $target = $course->only_grade_7
         ? 'nur Klasse 7'
         : flz_ags_allowed_grades_label((string) $course->allowed_grades);
+    $allowed_grades = flz_ags_sanitize_allowed_grades((string) $course->allowed_grades);
+    $grade_keys = $allowed_grades !== '' ? array_map('intval', explode(',', $allowed_grades)) : array();
+    $sort_grade = !empty($course->only_grade_7) ? 7 : (!empty($grade_keys) ? min($grade_keys) : 0);
+    $sort_weekday = !empty($weekdays) ? min(array_map('intval', $weekdays)) : 99;
+    $search_text = implode(' ', array(
+        (string) $course->title,
+        (string) $course->category,
+        (string) $course->leader_name,
+        (string) $course->short_description,
+        $target,
+        implode(' ', $slot_lines),
+    ));
     $meta = array();
     if (!empty($course->category)) {
         $meta['Bereich'] = $course->category;
@@ -139,6 +152,13 @@ function flz_ags_course_card_args(object $course): array
             'data-only-grade-7'        => (int) $course->only_grade_7,
             'data-allowed-grades'      => $course->allowed_grades,
             'data-full'                => $all_full ? '1' : '0',
+            'data-leader'              => (string) $course->leader_name,
+            'data-search'              => $search_text,
+            'data-sort-default'        => (int) $course->sort_order,
+            'data-sort-title'          => (string) $course->title,
+            'data-sort-grade'          => $sort_grade,
+            'data-sort-leader'         => (string) $course->leader_name,
+            'data-sort-weekday'        => $sort_weekday,
         ),
         'image_url' => flz_ags_course_image_url($course->image_url ?? ''),
         'image_alt' => (string) $course->title,

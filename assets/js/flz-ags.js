@@ -19,7 +19,14 @@
     }).filter(Boolean).indexOf(String(value)) !== -1;
   }
 
-  function isAllowed(item, selectedClass, weekday) {
+  function normalize(value) {
+    value = String(value || '').toLocaleLowerCase('de');
+    return typeof value.normalize === 'function'
+      ? value.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      : value;
+  }
+
+  function isAllowed(item, selectedClass, weekday, leader, searchTerm) {
     var grade = gradeKey(selectedClass);
     var onlyGrade7 = item.getAttribute('data-only-grade-7') === '1';
     var allowed = (item.getAttribute('data-allowed-grades') || '').split(',').map(function (entry) {
@@ -31,6 +38,9 @@
       if (!includesValue(weekdays, weekday)) return false;
     }
 
+    if (leader && normalize(item.getAttribute('data-leader')) !== normalize(leader)) return false;
+    if (searchTerm && normalize(item.getAttribute('data-search')).indexOf(normalize(searchTerm)) === -1) return false;
+
     if (!selectedClass) return true;
     if (onlyGrade7 && grade !== '7') return false;
     if (allowed.length > 0 && allowed.indexOf(String(grade).toUpperCase()) === -1) return false;
@@ -41,15 +51,50 @@
   function applyFilters(scope) {
     var classSelect = scope.querySelector('[data-flz-ags-class-select]');
     var weekdaySelect = scope.querySelector('[data-flz-ags-weekday-select]');
+    var leaderSelect = scope.querySelector('[data-flz-ags-leader-select]');
+    var searchInput = scope.querySelector('[data-flz-ags-search-input]');
+    var sortSelect = scope.querySelector('[data-flz-ags-sort-select]');
+    var itemsContainer = scope.querySelector('[data-flz-ags-items]');
+    var resultsStatus = scope.querySelector('[data-flz-ags-results-status]');
+    var noResults = scope.querySelector('[data-flz-ags-no-results]');
     var selectedClass = classSelect ? classSelect.value : '';
     var weekday = weekdaySelect ? weekdaySelect.value : '';
-    var items = scope.querySelectorAll('[data-flz-ags-filter-item]');
+    var leader = leaderSelect ? leaderSelect.value : '';
+    var searchTerm = searchInput ? searchInput.value.trim() : '';
+    var sortKey = sortSelect ? sortSelect.value : 'default';
+    var allowedSorts = ['default', 'title', 'grade', 'leader', 'weekday'];
+    var items = Array.prototype.slice.call(scope.querySelectorAll('[data-flz-ags-filter-item]'));
+    var visibleCount = 0;
+
+    if (allowedSorts.indexOf(sortKey) === -1) sortKey = 'default';
+
+    if (itemsContainer) {
+      items.sort(function (left, right) {
+        var attribute = 'data-sort-' + sortKey;
+        var leftValue = left.getAttribute(attribute) || '';
+        var rightValue = right.getAttribute(attribute) || '';
+        var numeric = sortKey === 'default' || sortKey === 'grade' || sortKey === 'weekday';
+        var comparison = numeric
+          ? Number(leftValue) - Number(rightValue)
+          : normalize(leftValue).localeCompare(normalize(rightValue), 'de');
+
+        if (comparison === 0 && sortKey !== 'title') {
+          comparison = normalize(left.getAttribute('data-sort-title')).localeCompare(normalize(right.getAttribute('data-sort-title')), 'de');
+        }
+        return comparison;
+      });
+
+      items.forEach(function (item) {
+        if (item.closest('.flz-ags') === scope) itemsContainer.appendChild(item);
+      });
+    }
 
     items.forEach(function (item) {
       if (item.closest('.flz-ags') !== scope) return;
 
-      var show = isAllowed(item, selectedClass, weekday);
+      var show = isAllowed(item, selectedClass, weekday, leader, searchTerm);
       item.hidden = !show;
+      if (show) visibleCount += 1;
 
       var input = item.getAttribute('data-weekday') ? item.querySelector('input[type="radio"]') : null;
       if (input) {
@@ -58,6 +103,9 @@
         if (!show && input.checked) input.checked = false;
       }
     });
+
+    if (resultsStatus) resultsStatus.textContent = visibleCount + (visibleCount === 1 ? ' AG angezeigt.' : ' AGs angezeigt.');
+    if (noResults) noResults.hidden = visibleCount !== 0;
   }
 
   function setRegistrationPanelSemantics(panel, active) {
@@ -137,11 +185,23 @@
   function initScope(scope) {
     var classSelects = scope.querySelectorAll('[data-flz-ags-class-select]');
     var weekdaySelects = scope.querySelectorAll('[data-flz-ags-weekday-select]');
+    var leaderSelects = scope.querySelectorAll('[data-flz-ags-leader-select]');
+    var searchInputs = scope.querySelectorAll('[data-flz-ags-search-input]');
+    var sortSelects = scope.querySelectorAll('[data-flz-ags-sort-select]');
 
     classSelects.forEach(function (select) {
       select.addEventListener('change', function () { applyFilters(scope); });
     });
     weekdaySelects.forEach(function (select) {
+      select.addEventListener('change', function () { applyFilters(scope); });
+    });
+    leaderSelects.forEach(function (select) {
+      select.addEventListener('change', function () { applyFilters(scope); });
+    });
+    searchInputs.forEach(function (input) {
+      input.addEventListener('input', function () { applyFilters(scope); });
+    });
+    sortSelects.forEach(function (select) {
       select.addEventListener('change', function () { applyFilters(scope); });
     });
 

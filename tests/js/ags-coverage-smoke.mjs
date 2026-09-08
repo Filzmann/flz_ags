@@ -168,6 +168,106 @@ assert.equal(modalBackground.inert, false);
 assert.equal(modalEntryTwo.inert, false);
 assert.equal(modalDrawerOne.getAttribute('aria-modal'), null);
 
+const makeControl = (value = '') => ({
+  value,
+  listeners: {},
+  addEventListener(type, handler) { this.listeners[type] = handler; }
+});
+const discoveryControls = {
+  className: makeControl(''),
+  weekday: makeControl(''),
+  leader: makeControl(''),
+  search: makeControl(''),
+  sort: makeControl('default')
+};
+const discoveryStatus = {textContent: ''};
+const discoveryNoResults = {hidden: true};
+const discoveryContainer = {
+  children: [],
+  appendChild(item) {
+    this.children = this.children.filter((child) => child !== item);
+    this.children.push(item);
+  }
+};
+let discoveryScope;
+const makeDiscoveryItem = (attributes) => ({
+  attributes,
+  hidden: false,
+  closest: () => discoveryScope,
+  getAttribute(name) { return this.attributes[name] ?? null; },
+  querySelector() { return null; }
+});
+const discoveryItems = [
+  makeDiscoveryItem({'data-only-grade-7': '0', 'data-allowed-grades': '8', 'data-weekdays': '2', 'data-leader': 'Berta Blau', 'data-search': 'Robotik Berta Blau Technik Dienstag', 'data-sort-default': '20', 'data-sort-title': 'Robotik', 'data-sort-grade': '8', 'data-sort-leader': 'Berta Blau', 'data-sort-weekday': '2'}),
+  makeDiscoveryItem({'data-only-grade-7': '1', 'data-allowed-grades': '7', 'data-weekdays': '1', 'data-leader': 'Änne Adler', 'data-search': 'Kunst Änne Adler Montag', 'data-sort-default': '10', 'data-sort-title': 'Kunst', 'data-sort-grade': '7', 'data-sort-leader': 'Änne Adler', 'data-sort-weekday': '1'}),
+  makeDiscoveryItem({'data-only-grade-7': '0', 'data-allowed-grades': '', 'data-weekdays': '3', 'data-leader': 'Berta Blau', 'data-search': 'Theater Berta Blau Mittwoch', 'data-sort-default': '30', 'data-sort-title': 'Theater', 'data-sort-grade': '0', 'data-sort-leader': 'Berta Blau', 'data-sort-weekday': '3'})
+];
+discoveryContainer.children = discoveryItems.slice();
+discoveryScope = {
+  querySelector(selector) {
+    return {
+      '[data-flz-ags-class-select]': discoveryControls.className,
+      '[data-flz-ags-weekday-select]': discoveryControls.weekday,
+      '[data-flz-ags-leader-select]': discoveryControls.leader,
+      '[data-flz-ags-search-input]': discoveryControls.search,
+      '[data-flz-ags-sort-select]': discoveryControls.sort,
+      '[data-flz-ags-items]': discoveryContainer,
+      '[data-flz-ags-results-status]': discoveryStatus,
+      '[data-flz-ags-no-results]': discoveryNoResults
+    }[selector] || null;
+  },
+  querySelectorAll(selector) {
+    if (selector === '[data-flz-ags-filter-item]') return discoveryItems;
+    const single = this.querySelector(selector);
+    return single ? [single] : [];
+  }
+};
+const discoveryListeners = new Map();
+const discoveryDocument = {
+  addEventListener(type, handler) { discoveryListeners.set(type, handler); },
+  querySelectorAll(selector) {
+    if (selector === '.flz-ags') return [discoveryScope];
+    return [];
+  }
+};
+const discoveryContext = vm.createContext({document: discoveryDocument, console, String});
+vm.runInContext(fs.readFileSync(frontendFile, 'utf8'), discoveryContext, {filename: frontendFile});
+discoveryListeners.get('DOMContentLoaded')();
+assert.deepEqual(discoveryContainer.children, [discoveryItems[1], discoveryItems[0], discoveryItems[2]]);
+assert.equal(discoveryStatus.textContent, '3 AGs angezeigt.');
+
+discoveryControls.className.value = '8';
+discoveryControls.weekday.value = '2';
+discoveryControls.leader.value = 'Berta Blau';
+discoveryControls.search.value = 'robotik';
+discoveryControls.search.listeners.input();
+assert.equal(discoveryItems[0].hidden, false);
+assert.equal(discoveryItems[1].hidden, true);
+assert.equal(discoveryItems[2].hidden, true);
+assert.equal(discoveryStatus.textContent, '1 AG angezeigt.');
+
+discoveryControls.search.value = 'nicht vorhanden';
+discoveryControls.search.listeners.input();
+assert.equal(discoveryNoResults.hidden, false);
+
+discoveryControls.className.value = '';
+discoveryControls.weekday.value = '';
+discoveryControls.leader.value = '';
+discoveryControls.search.value = '';
+discoveryControls.sort.value = 'title';
+discoveryControls.sort.listeners.change();
+assert.deepEqual(discoveryContainer.children, [discoveryItems[1], discoveryItems[0], discoveryItems[2]]);
+
+discoveryControls.search.value = 'anne';
+discoveryControls.search.listeners.input();
+assert.equal(discoveryItems[1].hidden, false);
+assert.equal(discoveryItems[0].hidden, true);
+
+discoveryControls.search.value = '';
+discoveryControls.sort.value = 'untrusted-column';
+discoveryControls.sort.listeners.change();
+assert.deepEqual(discoveryContainer.children, [discoveryItems[1], discoveryItems[0], discoveryItems[2]]);
+
 class Wrapper {
   constructor(subject = {}) {
     this.subject = subject;
@@ -204,8 +304,70 @@ class Wrapper {
   }
 }
 
+const adminListControls = {
+  search: makeControl(''),
+  grade: makeControl(''),
+  leader: makeControl(''),
+  weekday: makeControl(''),
+  sort: makeControl('default')
+};
+const adminStatus = {textContent: ''};
+const adminNoResults = {hidden: true};
+const makeAdminDetails = (id, hidden = true) => ({
+  id,
+  hidden,
+  attributes: {},
+  setAttribute(name, value) { this.attributes[name] = String(value); },
+  getAttribute(name) { return this.attributes[name] ?? null; },
+  removeAttribute(name) { delete this.attributes[name]; }
+});
+const makeAdminItem = (id, attributes) => ({
+  id,
+  attributes,
+  hidden: false,
+  getAttribute(name) { return this.attributes[name] ?? null; }
+});
+const adminItems = [
+  makeAdminItem('admin-robotik', {'data-only-grade-7': '0', 'data-allowed-grades': '8', 'data-weekdays': '2', 'data-leader': 'Berta Blau', 'data-search': 'Robotik Berta Blau Dienstag', 'data-sort-default': '20', 'data-sort-title': 'Robotik', 'data-sort-grade': '8', 'data-sort-leader': 'Berta Blau', 'data-sort-weekday': '2'}),
+  makeAdminItem('admin-kunst', {'data-only-grade-7': '1', 'data-allowed-grades': '7', 'data-weekdays': '1', 'data-leader': 'Änne Adler', 'data-search': 'Kunst Änne Adler Montag', 'data-sort-default': '10', 'data-sort-title': 'Kunst', 'data-sort-grade': '7', 'data-sort-leader': 'Änne Adler', 'data-sort-weekday': '1'}),
+  makeAdminItem('admin-theater', {'data-only-grade-7': '0', 'data-allowed-grades': '', 'data-weekdays': '3', 'data-leader': 'Berta Blau', 'data-search': 'Theater Berta Blau Mittwoch', 'data-sort-default': '30', 'data-sort-title': 'Theater', 'data-sort-grade': '0', 'data-sort-leader': 'Berta Blau', 'data-sort-weekday': '3'})
+];
+const adminDetails = new Map(adminItems.map((item) => [item.id, makeAdminDetails(item.id + '-details')]));
+const adminContainer = {
+  children: adminItems.flatMap((item) => [item, adminDetails.get(item.id)]),
+  appendChild(item) {
+    this.children = this.children.filter((child) => child !== item);
+    this.children.push(item);
+  }
+};
+const adminScope = {
+  querySelector(selector) {
+    const detailsMatch = selector.match(/^\[data-flz-ui-editable-details-for="(.+)"\]$/);
+    if (detailsMatch) return adminDetails.get(detailsMatch[1]) || null;
+    return {
+      '[data-flz-ags-admin-search]': adminListControls.search,
+      '[data-flz-ags-admin-grade]': adminListControls.grade,
+      '[data-flz-ags-admin-leader]': adminListControls.leader,
+      '[data-flz-ags-admin-weekday]': adminListControls.weekday,
+      '[data-flz-ags-admin-sort]': adminListControls.sort,
+      '[data-flz-ags-admin-items]': adminContainer,
+      '[data-flz-ags-admin-results-status]': adminStatus,
+      '[data-flz-ags-admin-no-results]': adminNoResults
+    }[selector] || null;
+  },
+  querySelectorAll(selector) {
+    if (selector === '[data-flz-ags-admin-item]') return adminItems;
+    if (selector === '[data-flz-ags-admin-search]') return [adminListControls.search];
+    if (selector === '[data-flz-ags-admin-grade], [data-flz-ags-admin-leader], [data-flz-ags-admin-weekday], [data-flz-ags-admin-sort]') {
+      return [adminListControls.grade, adminListControls.leader, adminListControls.weekday, adminListControls.sort];
+    }
+    return [];
+  }
+};
 const adminHandlers = new Map();
-const adminDocument = {};
+const adminDocument = {
+  querySelectorAll(selector) { return selector === '[data-flz-ags-admin-list]' ? [adminScope] : []; }
+};
 const documentWrapper = new Wrapper(adminDocument);
 const jquery = (subject) => subject === adminDocument ? documentWrapper : (subject instanceof Wrapper ? subject : new Wrapper(subject));
 jquery.trim = (value) => String(value).trim();
@@ -219,6 +381,35 @@ const adminContext = vm.createContext({window, document: adminDocument, jQuery: 
 const adminFile = path.join(root, 'assets/js/flz-ags-admin.js');
 vm.runInContext(fs.readFileSync(adminFile, 'utf8'), adminContext, {filename: adminFile});
 assert.ok(adminHandlers.size >= 7);
+assert.deepEqual(adminContainer.children.filter((item) => adminItems.includes(item)), [adminItems[1], adminItems[0], adminItems[2]]);
+assert.equal(adminStatus.textContent, '3 AGs angezeigt.');
+
+adminDetails.get('admin-robotik').hidden = false;
+adminListControls.grade.value = '8';
+adminListControls.weekday.value = '2';
+adminListControls.leader.value = 'Berta Blau';
+adminListControls.search.value = 'robotik';
+adminListControls.search.listeners.input();
+assert.equal(adminItems[0].hidden, false);
+assert.equal(adminItems[1].hidden, true);
+assert.equal(adminItems[2].hidden, true);
+assert.equal(adminDetails.get('admin-robotik').hidden, false);
+assert.equal(adminStatus.textContent, '1 AG angezeigt.');
+
+adminListControls.search.value = 'fehlt';
+adminListControls.search.listeners.input();
+assert.equal(adminNoResults.hidden, false);
+assert.equal(adminDetails.get('admin-robotik').hidden, true);
+assert.equal(adminDetails.get('admin-robotik').getAttribute('data-flz-ags-filter-hidden'), 'true');
+
+adminListControls.grade.value = '';
+adminListControls.weekday.value = '';
+adminListControls.leader.value = '';
+adminListControls.search.value = '';
+adminListControls.sort.value = 'weekday';
+adminListControls.sort.listeners.change();
+assert.equal(adminDetails.get('admin-robotik').hidden, false);
+assert.deepEqual(adminContainer.children.filter((item) => adminItems.includes(item)), [adminItems[1], adminItems[0], adminItems[2]]);
 
 const imageInput = new Wrapper({value: 'vorher'});
 const imageField = new Wrapper({findResults: {'[data-flz-ags-image-input]': imageInput}});

@@ -17,6 +17,7 @@
 
 .flz-ags input[type="text"],
 .flz-ags input[type="email"],
+.flz-ags input[type="search"],
 .flz-ags select,
 .flz-ags .flz-ui-input,
 .flz-ags .flz-ui-select {
@@ -243,6 +244,22 @@
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: end;
+}
+
+.flz-ags-admin-list-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+  margin: 0 0 0.85rem;
+  padding: 0.75rem;
+  border: 1px solid #dcdcde;
+  border-radius: 0.35rem;
+  background: #fff;
+}
+
+.flz-ags-admin-list-controls .flz-ui-field {
+  margin: 0;
 }
 
 .flz-ags-admin > h1 {
