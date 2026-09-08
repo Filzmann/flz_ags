@@ -2,7 +2,8 @@
 
 ## Prüfstatus
 
-**Funktionsstand 0.6.1 ohne offene P0-/P1-Befunde.** Admin-/AJAX-
+**Funktionsstand 0.6.1 ohne offene P0-/P1-Befunde; Release-Gate in
+Übernahmephase 5 bereit.** Admin-/AJAX-
 Pfade prüfen Capability und Nonce, CSV wird direkt gestreamt, Kapazität unter
 Slot-Sperre geprüft und aktive Mehrfachanmeldung durch einen eindeutigen
 Datenbankvertrag verhindert. Datenschutz, kurzlebige Mail-Capture-Diagnose und
