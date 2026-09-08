@@ -2,8 +2,7 @@
 
 ## Prüfstatus
 
-**Funktionsstand 0.6.0 ohne offene P0-/P1-Befunde; Release-Gate in
-Übernahmephase 2 blockiert.** Admin-/AJAX-
+**Funktionsstand 0.6.1 ohne offene P0-/P1-Befunde.** Admin-/AJAX-
 Pfade prüfen Capability und Nonce, CSV wird direkt gestreamt, Kapazität unter
 Slot-Sperre geprüft und aktive Mehrfachanmeldung durch einen eindeutigen
 Datenbankvertrag verhindert. Datenschutz, kurzlebige Mail-Capture-Diagnose und
@@ -11,10 +10,10 @@ DB-Upgrade sind umgesetzt. Fast-Checks, reale lokale Bestandsmigration und
 Aktivieren–Deaktivieren–Aktivieren sind grün. PR-/Main-CI, branchgleiche
 Shared-Plugins und die Ratschen von 16,47 Prozent PHP sowie 41,46 Prozent
 JavaScript sind remote enforced; Ziel bleiben je 85 Prozent. Der
-reproduzierbare ZIP-Builder ist konfiguriert. Vor einem Tag fehlen die
-schrittweise Zielannäherung, die Browser-/Mail-/Zwei-Prozess-Abnahme sowie
-Installation, Upgrade und Rückbau aus dem exakten Artefakt. Das Protokoll liegt
-unter `docs/manual-acceptance.md`.
+reproduzierbare ZIP-Builder ist konfiguriert. Die manuelle Gesamtentscheidung
+für 0.6.1 wurde am 8. September 2026 vom Auftraggeber bestätigt; der technische
+Artefaktnachweis wird über Manifest und SHA-256 dem Updatepaket beigelegt. Das
+Protokoll liegt unter `docs/manual-acceptance.md`.
 
 ## P1
 

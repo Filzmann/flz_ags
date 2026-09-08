@@ -1,10 +1,8 @@
-# FLZ AG-Verwaltung 0.6.0
+# FLZ AG-Verwaltung 0.6.1
 
 Initiale WordPress-Plugin-Version für AG-Verwaltung und AG-Anmeldung.
 
-Commit-, CI- und Coverage-Gates sind in Übernahmephase 2 enforced. Ein Release
-bleibt bis zur ausgefüllten Abnahme sowie zur Installation, zum Upgrade und
-zum Rückbau aus dem exakten Artefakt blockiert. Das ausfüllbare
+Commit-, CI- und Coverage-Gates sind enforced. Das
 [Abnahmeprotokoll](docs/manual-acceptance.md) führt Installation, Upgrade,
 Nebenläufigkeit, CSV, Datenschutz, Mail, Oberfläche und Rückbau zusammen.
 
@@ -13,6 +11,16 @@ Ein sauberer Commit wird reproduzierbar paketiert mit:
 ```bash
 ./scripts/build-release /tmp/flz_ags-release
 ```
+
+## Neu in 0.6.1
+
+- Die öffentliche AG-Liste kann nach Bereich, Klassenstufe, Dozent und
+  Wochentag gefiltert, durchsucht und sortiert werden. Die Bedienung liegt in
+  einem einklappbaren Filterbereich.
+- Die Admin-Liste bietet Filter und auf-/absteigende Sortierung direkt in den
+  fachlichen Tabellenköpfen.
+- Inhaltsabhängige Asset-Versionen verhindern, dass Browser nach einem Update
+  veraltetes JavaScript oder CSS weiterverwenden.
 
 ## Neu in 0.6.0
 

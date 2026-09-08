@@ -5,6 +5,8 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 
 ## Unreleased
 
+## 0.6.1 – 2026-09-08
+
 - Suche, Filter nach Bereich, Klassenstufe, Dozent und Wochentag sowie passende
   Sortieroptionen in öffentlicher AG-Liste und Backend ergänzt. Im Backend
   liegen sie direkt in den Tabellenköpfen; im Frontend in einem einklappbaren
