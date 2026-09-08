@@ -33,10 +33,11 @@ ohne ausdrückliche Freigabe; nie `git add .` verwenden.
 
 ## Commit-, Coverage- und Release-Gates
 
-- Der aktuelle Übernahmestand ist Phase 2: PR-/Main-CI, branchgleiche
+- Der aktuelle Übernahmestand ist Phase 5: PR-/Main-CI, branchgleiche
   Provider-Checkouts sowie PHP- und JavaScript-Coverage-Ratschen sind remote
-  belegt. Normale Produktcommits brauchen das enforced Commit-Gate;
-  Releasecommits bleiben bis zur Abnahme und zum Artefakt-Gate blockiert.
+  belegt. Manuelle Abnahme und reproduzierbarer Artefaktnachweis für Version
+  0.6.1 sind dokumentiert; Commit- und Release-Gate sind enforced
+  beziehungsweise ready.
 - Vor jedem normalen Commit sind Status, Diff-Statistik und vollständige
   Dateiliste zu zeigen; fokussierte Tests, `./scripts/check-fast`, Shared-
   Provider-/Consumer-Tests, CI und Coverage-Gates müssen grün sein. Dateien
