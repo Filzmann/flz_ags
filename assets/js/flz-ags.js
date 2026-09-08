@@ -26,7 +26,7 @@
       : value;
   }
 
-  function isAllowed(item, selectedClass, weekday, leader, searchTerm) {
+  function isAllowed(item, selectedClass, category, weekday, leader, searchTerm) {
     var grade = gradeKey(selectedClass);
     var onlyGrade7 = item.getAttribute('data-only-grade-7') === '1';
     var allowed = (item.getAttribute('data-allowed-grades') || '').split(',').map(function (entry) {
@@ -38,6 +38,7 @@
       if (!includesValue(weekdays, weekday)) return false;
     }
 
+    if (category && normalize(item.getAttribute('data-category')) !== normalize(category)) return false;
     if (leader && normalize(item.getAttribute('data-leader')) !== normalize(leader)) return false;
     if (searchTerm && normalize(item.getAttribute('data-search')).indexOf(normalize(searchTerm)) === -1) return false;
 
@@ -50,6 +51,7 @@
 
   function applyFilters(scope) {
     var classSelect = scope.querySelector('[data-flz-ags-class-select]');
+    var categorySelect = scope.querySelector('[data-flz-ags-category-select]');
     var weekdaySelect = scope.querySelector('[data-flz-ags-weekday-select]');
     var leaderSelect = scope.querySelector('[data-flz-ags-leader-select]');
     var searchInput = scope.querySelector('[data-flz-ags-search-input]');
@@ -58,11 +60,12 @@
     var resultsStatus = scope.querySelector('[data-flz-ags-results-status]');
     var noResults = scope.querySelector('[data-flz-ags-no-results]');
     var selectedClass = classSelect ? classSelect.value : '';
+    var category = categorySelect ? categorySelect.value : '';
     var weekday = weekdaySelect ? weekdaySelect.value : '';
     var leader = leaderSelect ? leaderSelect.value : '';
     var searchTerm = searchInput ? searchInput.value.trim() : '';
     var sortKey = sortSelect ? sortSelect.value : 'default';
-    var allowedSorts = ['default', 'title', 'grade', 'leader', 'weekday'];
+    var allowedSorts = ['default', 'title', 'category', 'grade', 'leader', 'weekday'];
     var items = Array.prototype.slice.call(scope.querySelectorAll('[data-flz-ags-filter-item]'));
     var visibleCount = 0;
 
@@ -92,7 +95,7 @@
     items.forEach(function (item) {
       if (item.closest('.flz-ags') !== scope) return;
 
-      var show = isAllowed(item, selectedClass, weekday, leader, searchTerm);
+      var show = isAllowed(item, selectedClass, category, weekday, leader, searchTerm);
       item.hidden = !show;
       if (show) visibleCount += 1;
 
@@ -184,12 +187,16 @@
 
   function initScope(scope) {
     var classSelects = scope.querySelectorAll('[data-flz-ags-class-select]');
+    var categorySelects = scope.querySelectorAll('[data-flz-ags-category-select]');
     var weekdaySelects = scope.querySelectorAll('[data-flz-ags-weekday-select]');
     var leaderSelects = scope.querySelectorAll('[data-flz-ags-leader-select]');
     var searchInputs = scope.querySelectorAll('[data-flz-ags-search-input]');
     var sortSelects = scope.querySelectorAll('[data-flz-ags-sort-select]');
 
     classSelects.forEach(function (select) {
+      select.addEventListener('change', function () { applyFilters(scope); });
+    });
+    categorySelects.forEach(function (select) {
       select.addEventListener('change', function () { applyFilters(scope); });
     });
     weekdaySelects.forEach(function (select) {
@@ -208,10 +215,16 @@
     applyFilters(scope);
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
+  function initDocument() {
     document.querySelectorAll('.flz-ags').forEach(initScope);
     syncRegistrationModalState();
-  });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDocument);
+  } else {
+    initDocument();
+  }
 
   document.addEventListener('click', syncRegistrationModalState);
   document.addEventListener('keydown', function (event) {

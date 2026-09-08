@@ -4,13 +4,19 @@ defined('ABSPATH') || exit;
 
 $ui = flz_ui();
 $leader_options = array();
+$category_options = array();
 foreach ((array) $courses as $course_option) {
 	$leader_option = trim((string) ($course_option->leader_name ?? ''));
+	$category_option = trim((string) ($course_option->category ?? ''));
 	if ($leader_option !== '') {
 		$leader_options[$leader_option] = $leader_option;
 	}
+	if ($category_option !== '') {
+		$category_options[$category_option] = $category_option;
+	}
 }
 natcasesort($leader_options);
+natcasesort($category_options);
 ?>
 <div data-flz-ags-admin-list>
 <div class="flz-ags-admin-toolbar">
@@ -98,13 +104,6 @@ natcasesort($leader_options);
 	<?php echo $ui->form_end(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formularende. ?>
 </div>
 
-<div class="flz-ags-admin-list-controls" aria-label="AG-Liste durchsuchen, filtern und sortieren">
-	<?php echo $ui->input('search', array('name' => 'course_search', 'label' => 'Suche', 'placeholder' => 'AG, Dozent, Bereich …', 'attrs' => array('data-flz-ags-admin-search' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
-	<?php echo $ui->field(array('type' => 'select', 'name' => 'grade_filter', 'label' => 'Klassenstufe', 'placeholder' => 'alle Klassenstufen', 'options' => flz_ags_grade_options(), 'attrs' => array('data-flz-ags-admin-grade' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
-	<?php echo $ui->field(array('type' => 'select', 'name' => 'leader_filter', 'label' => 'Dozent', 'placeholder' => 'alle Dozenten', 'options' => $leader_options, 'attrs' => array('data-flz-ags-admin-leader' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
-	<?php echo $ui->field(array('type' => 'select', 'name' => 'weekday_filter', 'label' => 'Wochentag', 'placeholder' => 'alle Tage', 'options' => flz_ags_weekdays(), 'attrs' => array('data-flz-ags-admin-weekday' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
-	<?php echo $ui->field(array('type' => 'select', 'name' => 'course_sort', 'label' => 'Sortierung', 'options' => array('default' => 'Vorgabe', 'title' => 'AG-Name', 'grade' => 'Klassenstufe', 'leader' => 'Dozent', 'weekday' => 'Wochentag'), 'attrs' => array('data-flz-ags-admin-sort' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
-</div>
 <p class="screen-reader-text" aria-live="polite" data-flz-ags-admin-results-status></p>
 
 <?php $csv_warnings = is_array($csv_report) ? (array) ($csv_report['warnings'] ?? array()) : array(); ?>
@@ -123,18 +122,49 @@ natcasesort($leader_options);
 <table class="widefat striped">
 	<thead>
 		<tr>
-			<th>Bild</th>
-			<th>AG</th>
-			<th>Bereich</th>
-			<th>Zielgruppe</th>
-			<th>Slots</th>
-			<th>Status</th>
-			<th></th>
+			<th scope="col">Bild</th>
+			<th scope="col" aria-sort="none">
+				<button type="button" class="flz-ags-admin-sort-button" data-flz-ags-admin-sort-button="title">AG</button>
+				<details class="flz-ags-admin-column-filter">
+					<summary>Filtern</summary>
+					<?php echo $ui->input('search', array('name' => 'course_search', 'label' => 'AG-Suche', 'placeholder' => 'Titel, Bereich …', 'attrs' => array('data-flz-ags-admin-search' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+				</details>
+			</th>
+			<th scope="col" aria-sort="none">
+				<button type="button" class="flz-ags-admin-sort-button" data-flz-ags-admin-sort-button="category">Bereich</button>
+				<details class="flz-ags-admin-column-filter">
+					<summary>Filtern</summary>
+					<?php echo $ui->field(array('type' => 'select', 'name' => 'category_filter', 'label' => 'Bereich', 'placeholder' => 'alle Bereiche', 'options' => $category_options, 'attrs' => array('data-flz-ags-admin-category' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+				</details>
+			</th>
+			<th scope="col" aria-sort="none">
+				<button type="button" class="flz-ags-admin-sort-button" data-flz-ags-admin-sort-button="grade">Klassenstufe</button>
+				<details class="flz-ags-admin-column-filter">
+					<summary>Filtern</summary>
+					<?php echo $ui->field(array('type' => 'select', 'name' => 'grade_filter', 'label' => 'Klassenstufe', 'placeholder' => 'alle Klassenstufen', 'options' => flz_ags_grade_options(), 'attrs' => array('data-flz-ags-admin-grade' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+				</details>
+			</th>
+			<th scope="col" aria-sort="none">
+				<button type="button" class="flz-ags-admin-sort-button" data-flz-ags-admin-sort-button="leader">Dozent</button>
+				<details class="flz-ags-admin-column-filter">
+					<summary>Filtern</summary>
+					<?php echo $ui->field(array('type' => 'select', 'name' => 'leader_filter', 'label' => 'Dozent', 'placeholder' => 'alle Dozenten', 'options' => $leader_options, 'attrs' => array('data-flz-ags-admin-leader' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+				</details>
+			</th>
+			<th scope="col" aria-sort="none">
+				<button type="button" class="flz-ags-admin-sort-button" data-flz-ags-admin-sort-button="weekday">Wochentag / Slots</button>
+				<details class="flz-ags-admin-column-filter">
+					<summary>Filtern</summary>
+					<?php echo $ui->field(array('type' => 'select', 'name' => 'weekday_filter', 'label' => 'Wochentag', 'placeholder' => 'alle Tage', 'options' => flz_ags_weekdays(), 'attrs' => array('data-flz-ags-admin-weekday' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+				</details>
+			</th>
+			<th scope="col">Status</th>
+			<th scope="col"><span class="screen-reader-text">Aktionen</span></th>
 		</tr>
 	</thead>
 	<tbody data-flz-ags-admin-items>
 	<?php if (empty($courses)) : ?>
-		<tr><td colspan="7">Keine AGs für dieses Schuljahr angelegt.</td></tr>
+		<tr><td colspan="8">Keine AGs für dieses Schuljahr angelegt.</td></tr>
 	<?php endif; ?>
 	<?php foreach ($courses as $course) : ?>
 		<?php
@@ -167,9 +197,11 @@ natcasesort($leader_options);
 				'data-only-grade-7' => (int) $course->only_grade_7,
 				'data-weekdays' => implode(',', $weekdays),
 				'data-leader' => (string) $course->leader_name,
+				'data-category' => (string) $course->category,
 				'data-search' => $search_text,
 				'data-sort-default' => (int) $course->sort_order,
 				'data-sort-title' => (string) $course->title,
+				'data-sort-category' => (string) $course->category,
 				'data-sort-grade' => $sort_grade,
 				'data-sort-leader' => (string) $course->leader_name,
 				'data-sort-weekday' => $sort_weekday,
@@ -217,6 +249,15 @@ natcasesort($leader_options);
 						'placeholder' => '7,8,9',
 					),
 				),
+				array(
+					'view'  => (string) $course->leader_name,
+					'field' => array(
+						'type'  => 'text',
+						'name'  => 'leader_name',
+						'label' => 'Leitung',
+						'value' => (string) $course->leader_name,
+					),
+				),
 				array('view' => implode(' | ', $slot_labels)),
 				array('view' => implode(', ', $status)),
 			),
@@ -229,12 +270,6 @@ natcasesort($leader_options);
 						'label' => 'Kurzbeschreibung',
 						'value' => (string) $course->short_description,
 						'rows'  => 3,
-					),
-					array(
-						'type'  => 'text',
-						'name'  => 'leader_name',
-						'label' => 'Leitung',
-						'value' => (string) $course->leader_name,
 					),
 					array(
 						'type'    => 'checkbox',
@@ -275,7 +310,7 @@ natcasesort($leader_options);
 		?>
 		<?php echo $quick_edit_row; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Der Renderer escaped Zellen, Formular, Nonce und Felder. ?>
 	<?php endforeach; ?>
-	<tr data-flz-ags-admin-no-results hidden><td colspan="7">Keine AG entspricht den gewählten Filtern.</td></tr>
+	<tr data-flz-ags-admin-no-results hidden><td colspan="8">Keine AG entspricht den gewählten Filtern.</td></tr>
 	</tbody>
 </table>
 </div>

@@ -6,6 +6,27 @@ defined('ABSPATH') || exit;
 // phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped
 
 /**
+ * Liefert eine reproduzierbare, inhaltsabhängige Version für Plugin-Assets.
+ */
+function flz_ags_asset_version(string $relative_path): string
+{
+    $relative_path = ltrim(str_replace('\\', '/', $relative_path), '/');
+    if ($relative_path === '' || str_contains($relative_path, '../')) {
+        return FLZ_AGS_VERSION;
+    }
+
+    $file = FLZ_AGS_DIR . $relative_path;
+    if (!is_file($file) || !is_readable($file)) {
+        return FLZ_AGS_VERSION;
+    }
+
+    $hash = hash_file('sha256', $file);
+    return is_string($hash) && $hash !== ''
+        ? FLZ_AGS_VERSION . '-' . substr($hash, 0, 12)
+        : FLZ_AGS_VERSION;
+}
+
+/**
  * Protokolliert technische Ursachen ohne sie an Besucher auszugeben.
  */
 function flz_ags_log_error(Throwable $error, string $context): void

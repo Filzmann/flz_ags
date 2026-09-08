@@ -125,8 +125,8 @@ class FLZ_AGS_Plugin
 
     public function register_frontend_assets(): void
     {
-        wp_register_style('flz-ags', FLZ_AGS_URL . 'assets/css/flz-ags.css', array('flz-ui-components'), FLZ_AGS_VERSION);
-        wp_register_script('flz-ags', FLZ_AGS_URL . 'assets/js/flz-ags.js', array('flz-ui-components'), FLZ_AGS_VERSION, true);
+        wp_register_style('flz-ags', FLZ_AGS_URL . 'assets/css/flz-ags.css', array('flz-ui-components'), flz_ags_asset_version('assets/css/flz-ags.css'));
+        wp_register_script('flz-ags', FLZ_AGS_URL . 'assets/js/flz-ags.js', array('flz-ui-components'), flz_ags_asset_version('assets/js/flz-ags.js'), true);
     }
 
     public function register_admin_assets(string $hook): void
@@ -135,9 +135,9 @@ class FLZ_AGS_Plugin
             return;
         }
 
-        wp_enqueue_style('flz-ags-admin', FLZ_AGS_URL . 'assets/css/flz-ags.css', array('flz-ui-components'), FLZ_AGS_VERSION);
+        wp_enqueue_style('flz-ags-admin', FLZ_AGS_URL . 'assets/css/flz-ags.css', array('flz-ui-components'), flz_ags_asset_version('assets/css/flz-ags.css'));
         wp_enqueue_media();
-        wp_enqueue_script('flz-ags-admin', FLZ_AGS_URL . 'assets/js/flz-ags-admin.js', array('jquery'), FLZ_AGS_VERSION, true);
+        wp_enqueue_script('flz-ags-admin', FLZ_AGS_URL . 'assets/js/flz-ags-admin.js', array('jquery'), flz_ags_asset_version('assets/js/flz-ags-admin.js'), true);
         wp_localize_script('flz-ags-admin', 'flzAgsAdmin', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('flz_ags_detail_page'),

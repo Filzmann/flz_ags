@@ -37,6 +37,7 @@ const items = [
   makeItem({'data-only-grade-7': '0', 'data-allowed-grades': ''})
 ];
 const document = {
+  readyState: 'loading',
   addEventListener(type, handler) { frontendListeners.set(type, handler); },
   querySelectorAll(selector) { return selector === '.flz-ags' ? [scope] : []; }
 };
@@ -120,6 +121,7 @@ modalBody.append(modalBackground, modalPage);
 
 const modalPanels = [modalPanelOne, modalPanelTwo];
 const modalDocument = {
+  readyState: 'loading',
   body: modalBody,
   addEventListener(type, handler) {
     const handlers = modalListeners.get(type) || [];
@@ -175,6 +177,7 @@ const makeControl = (value = '') => ({
 });
 const discoveryControls = {
   className: makeControl(''),
+  category: makeControl(''),
   weekday: makeControl(''),
   leader: makeControl(''),
   search: makeControl(''),
@@ -198,15 +201,16 @@ const makeDiscoveryItem = (attributes) => ({
   querySelector() { return null; }
 });
 const discoveryItems = [
-  makeDiscoveryItem({'data-only-grade-7': '0', 'data-allowed-grades': '8', 'data-weekdays': '2', 'data-leader': 'Berta Blau', 'data-search': 'Robotik Berta Blau Technik Dienstag', 'data-sort-default': '20', 'data-sort-title': 'Robotik', 'data-sort-grade': '8', 'data-sort-leader': 'Berta Blau', 'data-sort-weekday': '2'}),
-  makeDiscoveryItem({'data-only-grade-7': '1', 'data-allowed-grades': '7', 'data-weekdays': '1', 'data-leader': 'Änne Adler', 'data-search': 'Kunst Änne Adler Montag', 'data-sort-default': '10', 'data-sort-title': 'Kunst', 'data-sort-grade': '7', 'data-sort-leader': 'Änne Adler', 'data-sort-weekday': '1'}),
-  makeDiscoveryItem({'data-only-grade-7': '0', 'data-allowed-grades': '', 'data-weekdays': '3', 'data-leader': 'Berta Blau', 'data-search': 'Theater Berta Blau Mittwoch', 'data-sort-default': '30', 'data-sort-title': 'Theater', 'data-sort-grade': '0', 'data-sort-leader': 'Berta Blau', 'data-sort-weekday': '3'})
+  makeDiscoveryItem({'data-only-grade-7': '0', 'data-allowed-grades': '8', 'data-category': 'Technik', 'data-weekdays': '2', 'data-leader': 'Berta Blau', 'data-search': 'Robotik Berta Blau Technik Dienstag', 'data-sort-default': '20', 'data-sort-title': 'Robotik', 'data-sort-category': 'Technik', 'data-sort-grade': '8', 'data-sort-leader': 'Berta Blau', 'data-sort-weekday': '2'}),
+  makeDiscoveryItem({'data-only-grade-7': '1', 'data-allowed-grades': '7', 'data-category': 'Kunst', 'data-weekdays': '1', 'data-leader': 'Änne Adler', 'data-search': 'Kunst Änne Adler Montag', 'data-sort-default': '10', 'data-sort-title': 'Kunst', 'data-sort-category': 'Kunst', 'data-sort-grade': '7', 'data-sort-leader': 'Änne Adler', 'data-sort-weekday': '1'}),
+  makeDiscoveryItem({'data-only-grade-7': '0', 'data-allowed-grades': '', 'data-category': 'Bühne', 'data-weekdays': '3', 'data-leader': 'Berta Blau', 'data-search': 'Theater Berta Blau Mittwoch', 'data-sort-default': '30', 'data-sort-title': 'Theater', 'data-sort-category': 'Bühne', 'data-sort-grade': '0', 'data-sort-leader': 'Berta Blau', 'data-sort-weekday': '3'})
 ];
 discoveryContainer.children = discoveryItems.slice();
 discoveryScope = {
   querySelector(selector) {
     return {
       '[data-flz-ags-class-select]': discoveryControls.className,
+      '[data-flz-ags-category-select]': discoveryControls.category,
       '[data-flz-ags-weekday-select]': discoveryControls.weekday,
       '[data-flz-ags-leader-select]': discoveryControls.leader,
       '[data-flz-ags-search-input]': discoveryControls.search,
@@ -224,6 +228,7 @@ discoveryScope = {
 };
 const discoveryListeners = new Map();
 const discoveryDocument = {
+  readyState: 'loading',
   addEventListener(type, handler) { discoveryListeners.set(type, handler); },
   querySelectorAll(selector) {
     if (selector === '.flz-ags') return [discoveryScope];
@@ -268,6 +273,31 @@ discoveryControls.sort.value = 'untrusted-column';
 discoveryControls.sort.listeners.change();
 assert.deepEqual(discoveryContainer.children, [discoveryItems[1], discoveryItems[0], discoveryItems[2]]);
 
+discoveryControls.category.value = 'Technik';
+discoveryControls.category.listeners.change();
+assert.equal(discoveryItems[0].hidden, false);
+assert.equal(discoveryItems[1].hidden, true);
+
+discoveryControls.category.value = '';
+discoveryControls.sort.value = 'category';
+discoveryControls.sort.listeners.change();
+assert.deepEqual(discoveryContainer.children, [discoveryItems[2], discoveryItems[1], discoveryItems[0]]);
+
+discoveryStatus.textContent = 'nicht initialisiert';
+const lateFrontendListeners = new Map();
+const lateFrontendDocument = {
+  readyState: 'complete',
+  addEventListener(type, handler) { lateFrontendListeners.set(type, handler); },
+  querySelectorAll(selector) {
+    if (selector === '.flz-ags') return [discoveryScope];
+    return [];
+  }
+};
+const lateFrontendContext = vm.createContext({document: lateFrontendDocument, console, String});
+vm.runInContext(fs.readFileSync(frontendFile, 'utf8'), lateFrontendContext, {filename: frontendFile});
+assert.equal(discoveryStatus.textContent, '3 AGs angezeigt.');
+assert.equal(lateFrontendListeners.has('DOMContentLoaded'), false);
+
 class Wrapper {
   constructor(subject = {}) {
     this.subject = subject;
@@ -306,11 +336,34 @@ class Wrapper {
 
 const adminListControls = {
   search: makeControl(''),
+  category: makeControl(''),
   grade: makeControl(''),
   leader: makeControl(''),
-  weekday: makeControl(''),
-  sort: makeControl('default')
+  weekday: makeControl('')
 };
+const makeAdminSortButton = (sortKey) => {
+  const header = {
+    attributes: {'aria-sort': 'none'},
+    setAttribute(name, value) { this.attributes[name] = String(value); }
+  };
+  return {
+    attributes: {'data-flz-ags-admin-sort-button': sortKey},
+    listeners: {},
+    header,
+    addEventListener(type, handler) { this.listeners[type] = handler; },
+    closest(selector) { return selector === 'th' ? header : null; },
+    getAttribute(name) { return this.attributes[name] ?? null; },
+    setAttribute(name, value) { this.attributes[name] = String(value); }
+  };
+};
+const adminSortButtons = [
+  makeAdminSortButton('title'),
+  makeAdminSortButton('category'),
+  makeAdminSortButton('grade'),
+  makeAdminSortButton('leader'),
+  makeAdminSortButton('weekday'),
+  makeAdminSortButton('untrusted-column')
+];
 const adminStatus = {textContent: ''};
 const adminNoResults = {hidden: true};
 const makeAdminDetails = (id, hidden = true) => ({
@@ -328,9 +381,9 @@ const makeAdminItem = (id, attributes) => ({
   getAttribute(name) { return this.attributes[name] ?? null; }
 });
 const adminItems = [
-  makeAdminItem('admin-robotik', {'data-only-grade-7': '0', 'data-allowed-grades': '8', 'data-weekdays': '2', 'data-leader': 'Berta Blau', 'data-search': 'Robotik Berta Blau Dienstag', 'data-sort-default': '20', 'data-sort-title': 'Robotik', 'data-sort-grade': '8', 'data-sort-leader': 'Berta Blau', 'data-sort-weekday': '2'}),
-  makeAdminItem('admin-kunst', {'data-only-grade-7': '1', 'data-allowed-grades': '7', 'data-weekdays': '1', 'data-leader': 'Änne Adler', 'data-search': 'Kunst Änne Adler Montag', 'data-sort-default': '10', 'data-sort-title': 'Kunst', 'data-sort-grade': '7', 'data-sort-leader': 'Änne Adler', 'data-sort-weekday': '1'}),
-  makeAdminItem('admin-theater', {'data-only-grade-7': '0', 'data-allowed-grades': '', 'data-weekdays': '3', 'data-leader': 'Berta Blau', 'data-search': 'Theater Berta Blau Mittwoch', 'data-sort-default': '30', 'data-sort-title': 'Theater', 'data-sort-grade': '0', 'data-sort-leader': 'Berta Blau', 'data-sort-weekday': '3'})
+  makeAdminItem('admin-robotik', {'data-only-grade-7': '0', 'data-allowed-grades': '8', 'data-category': 'Technik', 'data-weekdays': '2', 'data-leader': 'Berta Blau', 'data-search': 'Robotik Berta Blau Dienstag', 'data-sort-default': '20', 'data-sort-title': 'Robotik', 'data-sort-category': 'Technik', 'data-sort-grade': '8', 'data-sort-leader': 'Berta Blau', 'data-sort-weekday': '2'}),
+  makeAdminItem('admin-kunst', {'data-only-grade-7': '1', 'data-allowed-grades': '7', 'data-category': 'Kunst', 'data-weekdays': '1', 'data-leader': 'Änne Adler', 'data-search': 'Kunst Änne Adler Montag', 'data-sort-default': '10', 'data-sort-title': 'Kunst', 'data-sort-category': 'Kunst', 'data-sort-grade': '7', 'data-sort-leader': 'Änne Adler', 'data-sort-weekday': '1'}),
+  makeAdminItem('admin-theater', {'data-only-grade-7': '0', 'data-allowed-grades': '', 'data-category': 'Bühne', 'data-weekdays': '3', 'data-leader': 'Berta Blau', 'data-search': 'Theater Berta Blau Mittwoch', 'data-sort-default': '30', 'data-sort-title': 'Theater', 'data-sort-category': 'Bühne', 'data-sort-grade': '0', 'data-sort-leader': 'Berta Blau', 'data-sort-weekday': '3'})
 ];
 const adminDetails = new Map(adminItems.map((item) => [item.id, makeAdminDetails(item.id + '-details')]));
 const adminContainer = {
@@ -346,10 +399,10 @@ const adminScope = {
     if (detailsMatch) return adminDetails.get(detailsMatch[1]) || null;
     return {
       '[data-flz-ags-admin-search]': adminListControls.search,
+      '[data-flz-ags-admin-category]': adminListControls.category,
       '[data-flz-ags-admin-grade]': adminListControls.grade,
       '[data-flz-ags-admin-leader]': adminListControls.leader,
       '[data-flz-ags-admin-weekday]': adminListControls.weekday,
-      '[data-flz-ags-admin-sort]': adminListControls.sort,
       '[data-flz-ags-admin-items]': adminContainer,
       '[data-flz-ags-admin-results-status]': adminStatus,
       '[data-flz-ags-admin-no-results]': adminNoResults
@@ -358,9 +411,10 @@ const adminScope = {
   querySelectorAll(selector) {
     if (selector === '[data-flz-ags-admin-item]') return adminItems;
     if (selector === '[data-flz-ags-admin-search]') return [adminListControls.search];
-    if (selector === '[data-flz-ags-admin-grade], [data-flz-ags-admin-leader], [data-flz-ags-admin-weekday], [data-flz-ags-admin-sort]') {
-      return [adminListControls.grade, adminListControls.leader, adminListControls.weekday, adminListControls.sort];
+    if (selector === '[data-flz-ags-admin-category], [data-flz-ags-admin-grade], [data-flz-ags-admin-leader], [data-flz-ags-admin-weekday]') {
+      return [adminListControls.category, adminListControls.grade, adminListControls.leader, adminListControls.weekday];
     }
+    if (selector === '[data-flz-ags-admin-sort-button]') return adminSortButtons;
     return [];
   }
 };
@@ -384,6 +438,14 @@ assert.ok(adminHandlers.size >= 7);
 assert.deepEqual(adminContainer.children.filter((item) => adminItems.includes(item)), [adminItems[1], adminItems[0], adminItems[2]]);
 assert.equal(adminStatus.textContent, '3 AGs angezeigt.');
 
+adminListControls.category.value = 'Technik';
+adminListControls.category.listeners.change();
+assert.equal(adminItems[0].hidden, false);
+assert.equal(adminItems[1].hidden, true);
+adminListControls.category.value = '';
+adminSortButtons[1].listeners.click();
+assert.deepEqual(adminContainer.children.filter((item) => adminItems.includes(item)), [adminItems[2], adminItems[1], adminItems[0]]);
+
 adminDetails.get('admin-robotik').hidden = false;
 adminListControls.grade.value = '8';
 adminListControls.weekday.value = '2';
@@ -406,10 +468,19 @@ adminListControls.grade.value = '';
 adminListControls.weekday.value = '';
 adminListControls.leader.value = '';
 adminListControls.search.value = '';
-adminListControls.sort.value = 'weekday';
-adminListControls.sort.listeners.change();
+adminSortButtons[4].listeners.click();
 assert.equal(adminDetails.get('admin-robotik').hidden, false);
 assert.deepEqual(adminContainer.children.filter((item) => adminItems.includes(item)), [adminItems[1], adminItems[0], adminItems[2]]);
+assert.equal(adminSortButtons[4].header.attributes['aria-sort'], 'ascending');
+assert.equal(adminSortButtons[4].attributes['aria-pressed'], 'true');
+
+adminSortButtons[4].listeners.click();
+assert.deepEqual(adminContainer.children.filter((item) => adminItems.includes(item)), [adminItems[2], adminItems[0], adminItems[1]]);
+assert.equal(adminSortButtons[4].header.attributes['aria-sort'], 'descending');
+
+adminSortButtons[5].listeners.click();
+assert.deepEqual(adminContainer.children.filter((item) => adminItems.includes(item)), [adminItems[2], adminItems[0], adminItems[1]]);
+assert.equal(adminSortButtons[5].header.attributes['aria-sort'], 'none');
 
 const imageInput = new Wrapper({value: 'vorher'});
 const imageField = new Wrapper({findResults: {'[data-flz-ags-image-input]': imageInput}});

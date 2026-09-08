@@ -24,19 +24,21 @@
 
   function applyAdminCourseList(scope) {
     var searchInput = scope.querySelector('[data-flz-ags-admin-search]');
+    var categorySelect = scope.querySelector('[data-flz-ags-admin-category]');
     var gradeSelect = scope.querySelector('[data-flz-ags-admin-grade]');
     var leaderSelect = scope.querySelector('[data-flz-ags-admin-leader]');
     var weekdaySelect = scope.querySelector('[data-flz-ags-admin-weekday]');
-    var sortSelect = scope.querySelector('[data-flz-ags-admin-sort]');
     var container = scope.querySelector('[data-flz-ags-admin-items]');
     var status = scope.querySelector('[data-flz-ags-admin-results-status]');
     var noResults = scope.querySelector('[data-flz-ags-admin-no-results]');
     var searchTerm = searchInput ? normalizeListValue(searchInput.value.trim()) : '';
+    var category = categorySelect ? normalizeListValue(categorySelect.value) : '';
     var grade = gradeSelect ? gradeSelect.value : '';
     var leader = leaderSelect ? normalizeListValue(leaderSelect.value) : '';
     var weekday = weekdaySelect ? weekdaySelect.value : '';
-    var sortKey = sortSelect ? sortSelect.value : 'default';
-    var allowedSorts = ['default', 'title', 'grade', 'leader', 'weekday'];
+    var sortKey = scope.flzAgsSortKey || 'default';
+    var sortDirection = scope.flzAgsSortDirection === 'descending' ? -1 : 1;
+    var allowedSorts = ['default', 'title', 'category', 'grade', 'leader', 'weekday'];
     var items = Array.prototype.slice.call(scope.querySelectorAll('[data-flz-ags-admin-item]'));
     var visibleCount = 0;
 
@@ -54,7 +56,15 @@
       if (comparison === 0 && sortKey !== 'title') {
         comparison = normalizeListValue(left.getAttribute('data-sort-title')).localeCompare(normalizeListValue(right.getAttribute('data-sort-title')), 'de');
       }
-      return comparison;
+      return comparison * sortDirection;
+    });
+
+    scope.querySelectorAll('[data-flz-ags-admin-sort-button]').forEach(function (button) {
+      var header = button.closest('th');
+      var active = button.getAttribute('data-flz-ags-admin-sort-button') === sortKey;
+
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      if (header) header.setAttribute('aria-sort', active ? (sortDirection === 1 ? 'ascending' : 'descending') : 'none');
     });
 
     items.forEach(function (item) {
@@ -62,10 +72,11 @@
       var allowedGrades = item.getAttribute('data-allowed-grades') || '';
       var show = true;
 
+      if (category) show = normalizeListValue(item.getAttribute('data-category')) === category;
       if (grade) {
-        show = item.getAttribute('data-only-grade-7') === '1'
+        show = show && (item.getAttribute('data-only-grade-7') === '1'
           ? grade === '7'
-          : (!allowedGrades || listIncludes(allowedGrades, grade));
+          : (!allowedGrades || listIncludes(allowedGrades, grade)));
       }
       if (show && weekday) show = listIncludes(item.getAttribute('data-weekdays'), weekday);
       if (show && leader) show = normalizeListValue(item.getAttribute('data-leader')) === leader;
@@ -101,8 +112,24 @@
       scope.querySelectorAll('[data-flz-ags-admin-search]').forEach(function (control) {
         control.addEventListener('input', function () { applyAdminCourseList(scope); });
       });
-      scope.querySelectorAll('[data-flz-ags-admin-grade], [data-flz-ags-admin-leader], [data-flz-ags-admin-weekday], [data-flz-ags-admin-sort]').forEach(function (control) {
+      scope.querySelectorAll('[data-flz-ags-admin-category], [data-flz-ags-admin-grade], [data-flz-ags-admin-leader], [data-flz-ags-admin-weekday]').forEach(function (control) {
         control.addEventListener('change', function () { applyAdminCourseList(scope); });
+      });
+      scope.querySelectorAll('[data-flz-ags-admin-sort-button]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var sortKey = button.getAttribute('data-flz-ags-admin-sort-button');
+          var allowedSorts = ['title', 'category', 'grade', 'leader', 'weekday'];
+
+          if (allowedSorts.indexOf(sortKey) === -1) return;
+
+          if (scope.flzAgsSortKey === sortKey) {
+            scope.flzAgsSortDirection = scope.flzAgsSortDirection === 'ascending' ? 'descending' : 'ascending';
+          } else {
+            scope.flzAgsSortKey = sortKey;
+            scope.flzAgsSortDirection = 'ascending';
+          }
+          applyAdminCourseList(scope);
+        });
       });
       applyAdminCourseList(scope);
     });

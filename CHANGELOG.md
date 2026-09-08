@@ -5,8 +5,11 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 
 ## Unreleased
 
-- Suche, Filter nach Klassenstufe, Dozent und Wochentag sowie passende
-  Sortieroptionen in öffentlicher AG-Liste und Backend ergänzt.
+- Suche, Filter nach Bereich, Klassenstufe, Dozent und Wochentag sowie passende
+  Sortieroptionen in öffentlicher AG-Liste und Backend ergänzt. Im Backend
+  liegen sie direkt in den Tabellenköpfen; im Frontend in einem einklappbaren
+  Filterbereich. Gefilterte Karten werden trotz ihres Flex-Layouts zuverlässig
+  ausgeblendet.
 - Backend-Aktion „Speichern und schließen“ mit eigenem kombiniertem Icon und
   Rückkehr zur AG-Liste ergänzt.
 - Reproduzierbare PR-/Main-CI für PHP 8.1 und 8.5 ergänzt.
