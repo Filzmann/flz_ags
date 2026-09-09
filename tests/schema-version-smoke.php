@@ -14,7 +14,7 @@ $upgrade = file_get_contents($root . '/activate-deactivate.php');
 
 foreach (
 	array(
-		"define('FLZ_AGS_VERSION', '0.6.1')" => $entrypoint,
+		"define('FLZ_AGS_VERSION', '0.6.2')" => $entrypoint,
 		"define('FLZ_AGS_DB_VERSION', '2.0.0')" => $entrypoint,
 		"get_option('flz_ags_db_version'" => $upgrade,
 		"update_option('flz_ags_db_version', FLZ_AGS_DB_VERSION" => $upgrade,

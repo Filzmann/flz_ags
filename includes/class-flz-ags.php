@@ -1372,15 +1372,11 @@ class FLZ_AGS_Plugin
         $this->assert_admin_permission();
 
         $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_GET['school_year']))) : flz_ags_current_school_year();
-        $status = isset($_GET['status']) ? sanitize_key(wp_unslash($_GET['status'])) : 'active';
-        if (!array_key_exists($status, flz_ags_status_labels())) {
-            $status = 'active';
-        }
 
         $registrations = array();
         $load_failed = false;
         try {
-            $registrations = FLZ_AGS_Registration::find_for_admin($school_year, $status);
+            $registrations = FLZ_AGS_Registration::find_for_admin($school_year, 'all');
         } catch (Throwable $error) {
             $load_failed = true;
             flz_ags_log_error($error, 'Laden der AG-Anmeldungen im Backend');
@@ -1409,7 +1405,6 @@ class FLZ_AGS_Plugin
 
         flz_ags_render_backend_template('registrations', array(
             'school_year' => $school_year,
-            'status' => $status,
             'registrations' => $registrations,
             'csv_report' => $csv_report,
         ));

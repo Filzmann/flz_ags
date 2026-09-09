@@ -5,6 +5,11 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 
 ## Unreleased
 
+## 0.6.2 – 2026-09-09
+
+- Filter in allen Spaltenköpfen sowie auf-/absteigende Sortierung in allen
+  fachlich sinnvollen Spalten der Backend-Anmeldungstabelle ergänzt.
+
 ## 0.6.1 – 2026-09-08
 
 - Suche, Filter nach Bereich, Klassenstufe, Dozent und Wochentag sowie passende

@@ -8,11 +8,11 @@ verwenden. Pro Fall genau ein Ergebnis markieren und Abweichungen begründen.
 
 | Feld | Eintrag |
 |---|---|
-| Datum / Prüfer*in | 8. September 2026 / Auftraggeber, bestätigt im Arbeitsdialog |
+| Datum / Prüfer*in | 9. September 2026 / Auftraggeber, Update und Artefakterstellung im Arbeitsdialog beauftragt |
 | Umgebung / WordPress / PHP / Datenbank | Lokales DDEV `tagore-local` / WordPress 7.1 / PHP 8.3 / MariaDB 10.11 |
 | Browser / Version / Viewport / Zoom | Auftraggeberseitige Sichtprüfung bestätigt; technische Browserangaben nicht übermittelt |
-| Plugin-Version / vollständiger Git-Commit | 0.6.1 / verbindlich im beiliegenden `manifest.tsv` |
-| Ausgangsversion / Artefakt / SHA-256 | 0.6.0 / `flz_ags-0.6.1.zip` / verbindlich in `SHA256SUMS` und `manifest.tsv` |
+| Plugin-Version / vollständiger Git-Commit | 0.6.2 / verbindlich im beiliegenden `manifest.tsv` |
+| Ausgangsversion / Artefakt / SHA-256 | 0.6.1 / `flz_ags-0.6.2.zip` / verbindlich in `SHA256SUMS` und `manifest.tsv` |
 | DDEV-Snapshot / Rückbaupunkt | Benannter DDEV-Snapshot vor Artefaktinstallation; Quell-Symlink wird nach der Prüfung wiederhergestellt |
 
 ## Automatisierte Nachweise
@@ -58,7 +58,7 @@ verwenden. Pro Fall genau ein Ergebnis markieren und Abweichungen begründen.
 | Feld | Eintrag |
 |---|---|
 | Erfolgreich / nicht erfolgreich / nicht geprüft | erfolgreich |
-| Kritische Abweichungen / Tickets | keine für Version 0.6.1 bestätigt |
+| Kritische Abweichungen / Tickets | keine für Version 0.6.2 bekannt |
 | Datenschutz und Rückbau freigegeben | [x] ja [ ] nein |
 | Gesamtentscheidung | [x] abgenommen [ ] mit Auflagen abgenommen [ ] nicht abgenommen |
-| Name / Datum | Auftraggeber (Bestätigung im Arbeitsdialog) / 8. September 2026 |
+| Name / Datum | Auftraggeber (Updateauftrag im Arbeitsdialog) / 9. September 2026 |

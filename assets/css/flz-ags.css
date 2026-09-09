@@ -316,6 +316,10 @@ th[aria-sort="descending"] .flz-ags-admin-sort-button::after {
   font-size: 0.85em;
 }
 
+.flz-ags-admin [data-flz-ags-registration-item][hidden] {
+  display: none !important;
+}
+
 .flz-ags-admin > h1 {
   margin-bottom: 0.5rem;
 }

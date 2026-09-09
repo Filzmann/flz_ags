@@ -135,6 +135,91 @@
     });
   }
 
+  function applyAdminRegistrationList(scope) {
+    var container = scope.querySelector('[data-flz-ags-registration-items]');
+    var status = scope.querySelector('[data-flz-ags-registration-results-status]');
+    var noResults = scope.querySelector('[data-flz-ags-registration-no-results]');
+    var filters = Array.prototype.slice.call(scope.querySelectorAll('[data-flz-ags-registration-filter]'));
+    var items = Array.prototype.slice.call(scope.querySelectorAll('[data-flz-ags-registration-item]'));
+    var allowedSorts = ['default', 'student', 'class', 'course', 'slot', 'email', 'status', 'date'];
+    var sortKey = scope.flzAgsRegistrationSortKey || 'default';
+    var sortDirection = scope.flzAgsRegistrationSortDirection === 'descending' ? -1 : 1;
+    var visibleCount = 0;
+
+    if (allowedSorts.indexOf(sortKey) === -1) sortKey = 'default';
+
+    items.sort(function (left, right) {
+      var leftValue = left.getAttribute('data-sort-' + sortKey) || '';
+      var rightValue = right.getAttribute('data-sort-' + sortKey) || '';
+      var numeric = sortKey === 'default';
+      var comparison = numeric
+        ? Number(leftValue) - Number(rightValue)
+        : normalizeListValue(leftValue).localeCompare(normalizeListValue(rightValue), 'de', {numeric: true});
+
+      if (comparison === 0 && sortKey !== 'student') {
+        comparison = normalizeListValue(left.getAttribute('data-sort-student')).localeCompare(normalizeListValue(right.getAttribute('data-sort-student')), 'de');
+      }
+      return comparison * sortDirection;
+    });
+
+    scope.querySelectorAll('[data-flz-ags-registration-sort]').forEach(function (button) {
+      var header = button.closest('th');
+      var active = button.getAttribute('data-flz-ags-registration-sort') === sortKey;
+
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      if (header) header.setAttribute('aria-sort', active ? (sortDirection === 1 ? 'ascending' : 'descending') : 'none');
+    });
+
+    items.forEach(function (item) {
+      var show = filters.every(function (control) {
+        var key = control.getAttribute('data-flz-ags-registration-filter');
+        var selected = normalizeListValue(control.value).trim();
+        var current = normalizeListValue(item.getAttribute('data-filter-' + key));
+
+        if (!selected) return true;
+        return control.getAttribute('data-flz-ags-filter-mode') === 'contains'
+          ? current.indexOf(selected) !== -1
+          : current === selected;
+      });
+
+      item.hidden = !show;
+      if (show) visibleCount += 1;
+      if (container) container.appendChild(item);
+    });
+
+    if (container && noResults) container.appendChild(noResults);
+    if (noResults) noResults.hidden = visibleCount !== 0 || items.length === 0;
+    if (status) status.textContent = visibleCount + (visibleCount === 1 ? ' Anmeldung angezeigt.' : ' Anmeldungen angezeigt.');
+  }
+
+  function initAdminRegistrationLists() {
+    if (!document.querySelectorAll) return;
+
+    document.querySelectorAll('[data-flz-ags-registration-list]').forEach(function (scope) {
+      scope.querySelectorAll('[data-flz-ags-registration-filter]').forEach(function (control) {
+        var eventName = control.getAttribute('data-flz-ags-filter-mode') === 'contains' ? 'input' : 'change';
+        control.addEventListener(eventName, function () { applyAdminRegistrationList(scope); });
+      });
+      scope.querySelectorAll('[data-flz-ags-registration-sort]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var sortKey = button.getAttribute('data-flz-ags-registration-sort');
+          var allowedSorts = ['student', 'class', 'course', 'slot', 'email', 'status', 'date'];
+
+          if (allowedSorts.indexOf(sortKey) === -1) return;
+
+          if (scope.flzAgsRegistrationSortKey === sortKey) {
+            scope.flzAgsRegistrationSortDirection = scope.flzAgsRegistrationSortDirection === 'ascending' ? 'descending' : 'ascending';
+          } else {
+            scope.flzAgsRegistrationSortKey = sortKey;
+            scope.flzAgsRegistrationSortDirection = 'ascending';
+          }
+          applyAdminRegistrationList(scope);
+        });
+      });
+      applyAdminRegistrationList(scope);
+    });
+  }
+
   function setPageMessage($field, message, isError) {
     var $results = $field.find('[data-flz-ags-page-results]');
     $results.empty().append(
@@ -334,4 +419,5 @@
   });
 
   initAdminCourseLists();
+  initAdminRegistrationLists();
 }(jQuery));

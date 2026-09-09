@@ -418,9 +418,75 @@ const adminScope = {
     return [];
   }
 };
+
+const registrationFilterKeys = ['student', 'class', 'course', 'slot', 'email', 'status', 'date', 'action'];
+const registrationControls = Object.fromEntries(registrationFilterKeys.map((key) => [key, {
+  value: '',
+  listeners: {},
+  attributes: Object.assign(
+    {'data-flz-ags-registration-filter': key},
+    ['student', 'email'].includes(key) ? {'data-flz-ags-filter-mode': 'contains'} : {}
+  ),
+  addEventListener(type, handler) { this.listeners[type] = handler; },
+  getAttribute(name) { return this.attributes[name] ?? null; }
+}]));
+const makeRegistrationSortButton = (sortKey) => {
+  const header = {
+    attributes: {'aria-sort': 'none'},
+    setAttribute(name, value) { this.attributes[name] = String(value); }
+  };
+  return {
+    attributes: {'data-flz-ags-registration-sort': sortKey},
+    listeners: {},
+    header,
+    addEventListener(type, handler) { this.listeners[type] = handler; },
+    closest(selector) { return selector === 'th' ? header : null; },
+    getAttribute(name) { return this.attributes[name] ?? null; },
+    setAttribute(name, value) { this.attributes[name] = String(value); }
+  };
+};
+const registrationSortButtons = [...registrationFilterKeys.filter((key) => key !== 'action'), 'untrusted-column'].map(makeRegistrationSortButton);
+const makeRegistrationItem = (attributes) => ({
+  attributes,
+  hidden: false,
+  getAttribute(name) { return this.attributes[name] ?? null; }
+});
+const registrationItems = [
+  makeRegistrationItem({'data-filter-student': 'Blau, Berta', 'data-filter-class': '8a', 'data-filter-course': 'Robotik', 'data-filter-slot': 'Dienstag, 14:00–15:00', 'data-filter-email': 'berta@example.invalid', 'data-filter-status': 'active', 'data-filter-date': '2026-09-09', 'data-filter-action': 'withdrawable', 'data-sort-default': '0', 'data-sort-student': 'Blau, Berta', 'data-sort-class': '8a', 'data-sort-course': 'Robotik', 'data-sort-slot': '2-14:00', 'data-sort-email': 'berta@example.invalid', 'data-sort-status': 'Aktiv', 'data-sort-date': '2026-09-09 09:00:00', 'data-sort-action': '1'}),
+  makeRegistrationItem({'data-filter-student': 'Adler, Änne', 'data-filter-class': '7b', 'data-filter-course': 'Kunst', 'data-filter-slot': 'Montag, 13:00–14:00', 'data-filter-email': 'aenne@example.invalid', 'data-filter-status': 'withdrawn', 'data-filter-date': '2026-09-08', 'data-filter-action': 'none', 'data-sort-default': '1', 'data-sort-student': 'Adler, Änne', 'data-sort-class': '7b', 'data-sort-course': 'Kunst', 'data-sort-slot': '1-13:00', 'data-sort-email': 'aenne@example.invalid', 'data-sort-status': 'Widerrufen', 'data-sort-date': '2026-09-08 10:00:00', 'data-sort-action': '0'}),
+  makeRegistrationItem({'data-filter-student': 'Clara, Cora', 'data-filter-class': '9c', 'data-filter-course': 'Theater', 'data-filter-slot': 'Mittwoch, 15:00–16:00', 'data-filter-email': 'cora@example.invalid', 'data-filter-status': 'active', 'data-filter-date': '2026-09-07', 'data-filter-action': 'withdrawable', 'data-sort-default': '2', 'data-sort-student': 'Clara, Cora', 'data-sort-class': '9c', 'data-sort-course': 'Theater', 'data-sort-slot': '3-15:00', 'data-sort-email': 'cora@example.invalid', 'data-sort-status': 'Aktiv', 'data-sort-date': '2026-09-07 11:00:00', 'data-sort-action': '1'})
+];
+const registrationContainer = {
+  children: registrationItems.slice(),
+  appendChild(item) {
+    this.children = this.children.filter((child) => child !== item);
+    this.children.push(item);
+  }
+};
+const registrationStatus = {textContent: ''};
+const registrationNoResults = {hidden: true};
+const registrationScope = {
+  querySelector(selector) {
+    return {
+      '[data-flz-ags-registration-items]': registrationContainer,
+      '[data-flz-ags-registration-results-status]': registrationStatus,
+      '[data-flz-ags-registration-no-results]': registrationNoResults
+    }[selector] || null;
+  },
+  querySelectorAll(selector) {
+    if (selector === '[data-flz-ags-registration-item]') return registrationItems;
+    if (selector === '[data-flz-ags-registration-filter]') return Object.values(registrationControls);
+    if (selector === '[data-flz-ags-registration-sort]') return registrationSortButtons;
+    return [];
+  }
+};
 const adminHandlers = new Map();
 const adminDocument = {
-  querySelectorAll(selector) { return selector === '[data-flz-ags-admin-list]' ? [adminScope] : []; }
+  querySelectorAll(selector) {
+    if (selector === '[data-flz-ags-admin-list]') return [adminScope];
+    if (selector === '[data-flz-ags-registration-list]') return [registrationScope];
+    return [];
+  }
 };
 const documentWrapper = new Wrapper(adminDocument);
 const jquery = (subject) => subject === adminDocument ? documentWrapper : (subject instanceof Wrapper ? subject : new Wrapper(subject));
@@ -481,6 +547,56 @@ assert.equal(adminSortButtons[4].header.attributes['aria-sort'], 'descending');
 adminSortButtons[5].listeners.click();
 assert.deepEqual(adminContainer.children.filter((item) => adminItems.includes(item)), [adminItems[2], adminItems[0], adminItems[1]]);
 assert.equal(adminSortButtons[5].header.attributes['aria-sort'], 'none');
+
+assert.equal(registrationStatus.textContent, '3 Anmeldungen angezeigt.');
+registrationControls.status.value = 'withdrawn';
+registrationControls.status.listeners.change();
+assert.equal(registrationItems[0].hidden, true);
+assert.equal(registrationItems[1].hidden, false);
+assert.equal(registrationItems[2].hidden, true);
+
+registrationControls.course.value = 'Kunst';
+registrationControls.course.listeners.change();
+assert.equal(registrationItems[1].hidden, false);
+registrationControls.course.value = 'Robotik';
+registrationControls.course.listeners.change();
+assert.equal(registrationNoResults.hidden, false);
+assert.equal(registrationStatus.textContent, '0 Anmeldungen angezeigt.');
+
+registrationControls.status.value = '';
+registrationControls.course.value = '';
+registrationSortButtons[0].listeners.click();
+assert.deepEqual(registrationContainer.children.filter((item) => registrationItems.includes(item)), [registrationItems[1], registrationItems[0], registrationItems[2]]);
+assert.equal(registrationSortButtons[0].header.attributes['aria-sort'], 'ascending');
+registrationSortButtons[0].listeners.click();
+assert.deepEqual(registrationContainer.children.filter((item) => registrationItems.includes(item)), [registrationItems[2], registrationItems[0], registrationItems[1]]);
+assert.equal(registrationSortButtons[0].header.attributes['aria-sort'], 'descending');
+
+registrationControls.date.value = '2026-09-07';
+registrationControls.date.listeners.change();
+assert.equal(registrationItems[2].hidden, false);
+assert.equal(registrationItems[0].hidden, true);
+
+registrationControls.date.value = '';
+registrationControls.student.value = 'änne';
+registrationControls.student.listeners.input();
+assert.equal(registrationItems[1].hidden, false);
+assert.equal(registrationItems[0].hidden, true);
+registrationControls.student.value = '';
+registrationControls.email.value = 'cora@';
+registrationControls.email.listeners.input();
+assert.equal(registrationItems[2].hidden, false);
+assert.equal(registrationItems[1].hidden, true);
+registrationControls.email.value = '';
+registrationControls.action.value = 'none';
+registrationControls.action.listeners.change();
+assert.equal(registrationItems[1].hidden, false);
+assert.equal(registrationItems[0].hidden, true);
+
+const registrationOrderBeforeInvalidSort = registrationContainer.children.slice();
+registrationSortButtons[7].listeners.click();
+assert.deepEqual(registrationContainer.children, registrationOrderBeforeInvalidSort);
+assert.equal(registrationSortButtons[7].header.attributes['aria-sort'], 'none');
 
 const imageInput = new Wrapper({value: 'vorher'});
 const imageField = new Wrapper({findResults: {'[data-flz-ags-image-input]': imageInput}});

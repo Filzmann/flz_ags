@@ -2,7 +2,7 @@
 
 ## Prüfstatus
 
-**Funktionsstand 0.6.1 ohne offene P0-/P1-Befunde; Release-Gate in
+**Funktionsstand 0.6.2 ohne offene P0-/P1-Befunde; Release-Gate in
 Übernahmephase 5 bereit.** Admin-/AJAX-
 Pfade prüfen Capability und Nonce, CSV wird direkt gestreamt, Kapazität unter
 Slot-Sperre geprüft und aktive Mehrfachanmeldung durch einen eindeutigen
@@ -12,7 +12,7 @@ Aktivieren–Deaktivieren–Aktivieren sind grün. PR-/Main-CI, branchgleiche
 Shared-Plugins und die Ratschen von 16,47 Prozent PHP sowie 41,46 Prozent
 JavaScript sind remote enforced; Ziel bleiben je 85 Prozent. Der
 reproduzierbare ZIP-Builder ist konfiguriert. Die manuelle Gesamtentscheidung
-für 0.6.1 wurde am 8. September 2026 vom Auftraggeber bestätigt; der technische
+für 0.6.2 wurde am 9. September 2026 vom Auftraggeber beauftragt; der technische
 Artefaktnachweis wird über Manifest und SHA-256 dem Updatepaket beigelegt. Das
 Protokoll liegt unter `docs/manual-acceptance.md`.
 

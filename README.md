@@ -1,4 +1,4 @@
-# FLZ AG-Verwaltung 0.6.1
+# FLZ AG-Verwaltung 0.6.2
 
 Initiale WordPress-Plugin-Version für AG-Verwaltung und AG-Anmeldung.
 
@@ -11,6 +11,13 @@ Ein sauberer Commit wird reproduzierbar paketiert mit:
 ```bash
 ./scripts/build-release /tmp/flz_ags-release
 ```
+
+## Neu in 0.6.2
+
+- Die Backend-Anmeldungstabelle bietet Filter in sämtlichen Spaltenköpfen.
+- Schüler*in, Klasse, AG, Slot, E-Mail, Status und Datum lassen sich direkt im
+  Tabellenkopf auf- und absteigend sortieren; die reine Aktionsspalte bleibt
+  bewusst unsortierbar.
 
 ## Neu in 0.6.1
 
