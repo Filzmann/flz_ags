@@ -220,6 +220,43 @@
     });
   }
 
+  function resetRegistrationSlotOptions(courseSelect) {
+    var row = courseSelect.closest('[data-flz-ui-editable-row]');
+    var slotSelect = row && row.querySelector('[data-flz-ags-registration-slot]');
+    var rawMap = slotSelect && slotSelect.getAttribute('data-flz-ags-registration-slot-map');
+    var slotMap = {};
+    var courseId = courseSelect.value;
+
+    if (!slotSelect) return;
+
+    try {
+      slotMap = rawMap ? JSON.parse(rawMap) : {};
+    } catch (error) {
+      slotMap = {};
+    }
+
+    while (slotSelect.firstChild) {
+      slotSelect.removeChild(slotSelect.firstChild);
+    }
+
+    slotSelect.appendChild(new Option('Bitte einen freien Slot auswählen', ''));
+    Object.keys(slotMap[courseId] || {}).forEach(function (slotId) {
+      slotSelect.appendChild(new Option(slotMap[courseId][slotId], slotId));
+    });
+    slotSelect.value = '';
+    slotSelect.disabled = Object.keys(slotMap[courseId] || {}).length === 0;
+  }
+
+  function initAdminRegistrationSlotSelectors() {
+    if (!document.querySelectorAll) return;
+
+    document.querySelectorAll('[data-flz-ags-registration-course]').forEach(function (courseSelect) {
+      courseSelect.addEventListener('change', function () {
+        resetRegistrationSlotOptions(courseSelect);
+      });
+    });
+  }
+
   function setPageMessage($field, message, isError) {
     var $results = $field.find('[data-flz-ags-page-results]');
     $results.empty().append(
@@ -420,4 +457,5 @@
 
   initAdminCourseLists();
   initAdminRegistrationLists();
+  initAdminRegistrationSlotSelectors();
 }(jQuery));

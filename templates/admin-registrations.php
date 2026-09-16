@@ -13,6 +13,27 @@ $export_url = wp_nonce_url(
 $class_options = array();
 $course_options = array();
 $slot_options = array();
+$course_edit_options = array();
+$slot_edit_options_by_course = array();
+foreach ((array) $slots as $slot_option) {
+	$taken = FLZ_AGS_Registration::count_by(array('slot_id' => (int) $slot_option->id, 'status' => 'active'));
+	$max_participants = (int) ($slot_option->max_participants ?? 0);
+	if ($max_participants > 0 && $taken >= $max_participants) {
+		continue;
+	}
+
+	$course_id = (int) ($slot_option->course_id ?? 0);
+	$course_title = (string) ($slot_option->title ?? '');
+	$slot_label = (string) ($slot_option->title ?? '') . ' · '
+		. flz_ags_weekday_label((int) ($slot_option->weekday ?? 0))
+		. ', ' . flz_ags_format_time((string) ($slot_option->start_time ?? ''))
+		. '–' . flz_ags_format_time((string) ($slot_option->end_time ?? ''))
+		. (!empty($slot_option->room) ? ', ' . (string) $slot_option->room : '');
+	if ($course_id > 0 && $course_title !== '' && !empty($slot_option->id)) {
+		$course_edit_options[$course_id] = $course_title;
+		$slot_edit_options_by_course[$course_id][(int) $slot_option->id] = $slot_label;
+	}
+}
 foreach ((array) $registrations as $registration_option) {
 	$class_value = (string) ($registration_option->class_name ?? '');
 	$course_value = (string) ($registration_option->title ?? '');
@@ -156,7 +177,7 @@ echo $ui->csv_panel(array(
 			<th scope="col">
 				<span>Aktion</span>
 				<details class="flz-ags-admin-column-filter"><summary>Filtern</summary>
-					<?php echo $ui->field(array('type' => 'select', 'name' => 'registration_action_filter', 'label' => 'Aktion', 'placeholder' => 'alle Aktionen', 'options' => array('withdrawable' => 'Widerruf möglich', 'none' => 'Keine Aktion'), 'attrs' => array('data-flz-ags-registration-filter' => 'action'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+					<?php echo $ui->field(array('type' => 'select', 'name' => 'registration_action_filter', 'label' => 'Aktion', 'placeholder' => 'alle Aktionen', 'options' => array('editable' => 'Bearbeitbar'), 'attrs' => array('data-flz-ags-registration-filter' => 'action'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
 				</details>
 			</th>
 		</tr>
@@ -179,55 +200,69 @@ echo $ui->csv_panel(array(
 			$status_key = (string) $registration->status;
 			$status_label = flz_ags_status_label($status_key);
 			$date_value = substr((string) $registration->created_at, 0, 10);
-			$action_key = $status_key === 'active' ? 'withdrawable' : 'none';
+			$action_key = 'editable';
+			$current_course_id = (int) $registration->course_id;
+			$row_course_edit_options = $course_edit_options;
+			$row_slot_edit_options_by_course = $slot_edit_options_by_course;
+			if (!isset($row_course_edit_options[$current_course_id])) {
+				$row_course_edit_options[$current_course_id] = $course_label;
+			}
+			if (!isset($row_slot_edit_options_by_course[$current_course_id][(int) $registration->slot_id])) {
+				$row_slot_edit_options_by_course[$current_course_id][(int) $registration->slot_id] = $course_label . ' · ' . $slot_label;
+			}
 			?>
-			<tr data-flz-ags-registration-item
-				data-filter-student="<?php echo esc_attr($student_label); ?>"
-				data-filter-class="<?php echo esc_attr((string) $registration->class_name); ?>"
-				data-filter-course="<?php echo esc_attr($course_label); ?>"
-				data-filter-slot="<?php echo esc_attr($slot_label); ?>"
-				data-filter-email="<?php echo esc_attr($email); ?>"
-				data-filter-status="<?php echo esc_attr($status_key); ?>"
-				data-filter-date="<?php echo esc_attr($date_value); ?>"
-				data-filter-action="<?php echo esc_attr($action_key); ?>"
-				data-sort-default="<?php echo esc_attr((string) $registration_index++); ?>"
-				data-sort-student="<?php echo esc_attr($student_label); ?>"
-				data-sort-class="<?php echo esc_attr($class_label); ?>"
-				data-sort-course="<?php echo esc_attr($course_label); ?>"
-				data-sort-slot="<?php echo esc_attr(sprintf('%d-%s', (int) $registration->weekday, (string) $registration->start_time)); ?>"
-				data-sort-email="<?php echo esc_attr($email); ?>"
-				data-sort-status="<?php echo esc_attr($status_label); ?>"
-				data-sort-date="<?php echo esc_attr((string) $registration->created_at); ?>">
-				<td><?php echo esc_html($student_label); ?></td>
-				<td><?php echo esc_html($class_label); ?></td>
-				<td><?php echo esc_html($course_label); ?></td>
-				<td>
-					<?php echo esc_html($slot_label); ?>
-				</td>
-				<td><?php echo esc_html($email); ?></td>
-				<td><?php echo esc_html($status_label); ?></td>
-				<td><?php echo esc_html(flz_ui_format_datetime($registration->created_at, (string) $registration->created_at)); ?></td>
-				<td>
-					<?php
-					if ($registration->status === 'active') {
-						// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- flz_ui renderer escaped das Aktionsformular inklusive URL, Nonce und Hidden Fields.
-						echo $ui->action_form_button(array(
-							'preset' => 'reset',
-							'label' => 'Anmeldung widerrufen',
-							'method' => 'post',
-							'action' => esc_url(admin_url('admin-post.php')),
-							'nonce' => 'flz_ags_update_registration',
-							'hidden' => array(
-								'action' => 'flz_ags_update_registration',
-								'registration_id' => absint($registration->id),
-								'new_status' => 'withdrawn',
-							),
-						));
-						// phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
-					}
-					?>
-				</td>
-			</tr>
+			<?php
+			// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- flz_ui rendert die vollständige, escapte Inline-Bearbeitungszeile.
+			echo $ui->editable_row(array(
+				'id' => 'flz-ags-registration-' . absint($registration->id),
+				'attrs' => array(
+					'data-flz-ags-registration-item' => true,
+					'data-filter-student' => $student_label,
+					'data-filter-class' => (string) $registration->class_name,
+					'data-filter-course' => $course_label,
+					'data-filter-slot' => $slot_label,
+					'data-filter-email' => $email,
+					'data-filter-status' => $status_key,
+					'data-filter-date' => $date_value,
+					'data-filter-action' => $action_key,
+					'data-sort-default' => (string) $registration_index++,
+					'data-sort-student' => $student_label,
+					'data-sort-class' => $class_label,
+					'data-sort-course' => $course_label,
+					'data-sort-slot' => sprintf('%d-%s', (int) $registration->weekday, (string) $registration->start_time),
+					'data-sort-email' => $email,
+					'data-sort-status' => $status_label,
+					'data-sort-date' => (string) $registration->created_at,
+				),
+				'form' => array(
+					'method' => 'post',
+					'action' => esc_url(admin_url('admin-post.php')),
+					'nonce' => 'flz_ags_update_registration',
+					'hidden' => array(
+						'action' => 'flz_ags_update_registration',
+						'registration_id' => absint($registration->id),
+					),
+				),
+				'cells' => array(
+					array('view' => $student_label, 'field' => array('type' => 'text', 'name' => 'student_last_name', 'label' => 'Nachname', 'value' => (string) $registration->student_last_name, 'required' => true)),
+					array('view' => $class_label, 'field' => array('type' => 'text', 'name' => 'class_name', 'label' => 'Klasse', 'value' => (string) $registration->class_name, 'required' => true)),
+					array('view' => $course_label, 'field' => array('type' => 'select', 'name' => 'course_id', 'label' => 'AG', 'value' => $current_course_id, 'options' => $row_course_edit_options, 'attrs' => array('data-flz-ags-registration-course' => true))),
+					array('view' => $slot_label, 'field' => array('type' => 'select', 'name' => 'slot_id', 'label' => 'Slot', 'value' => (int) $registration->slot_id, 'options' => $row_slot_edit_options_by_course[$current_course_id], 'required' => true, 'attrs' => array('data-flz-ags-registration-slot' => true, 'data-flz-ags-registration-slot-map' => wp_json_encode($row_slot_edit_options_by_course)))),
+					array('view' => $email, 'field' => array('type' => 'email', 'name' => 'student_email', 'label' => 'E-Mail Schüler*in', 'value' => $email, 'required' => true, 'autocomplete' => 'email')),
+					array('view' => $status_label, 'field' => array('type' => 'select', 'name' => 'new_status', 'label' => 'Status', 'value' => $status_key, 'options' => flz_ags_status_labels())),
+					array('view' => flz_ui_format_datetime($registration->created_at, (string) $registration->created_at)),
+				),
+				'edit' => array('label' => 'Anmeldung bearbeiten'),
+				'save' => array('label' => 'Anmeldung speichern'),
+				'details' => array(
+					'label' => 'Weitere Angaben',
+					'fields' => array(
+						array('type' => 'text', 'name' => 'student_first_name', 'label' => 'Vorname', 'value' => (string) $registration->student_first_name, 'required' => true),
+					),
+				),
+			));
+			// phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
+			?>
 		<?php endforeach; ?>
 		<?php if (!empty($registrations)) : ?>
 			<tr hidden data-flz-ags-registration-no-results><td colspan="8">Keine Anmeldungen entsprechen den Filtern.</td></tr>

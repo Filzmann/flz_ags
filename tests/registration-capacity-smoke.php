@@ -54,7 +54,7 @@ $update = flz_ags_capacity_test_section(
 );
 flz_ags_capacity_test_assert(
 	str_contains($update, 'FLZ_AGS_Model::transaction(')
-	&& str_contains($update, '$this->get_slot_with_course((int) $registration->slot_id, true)')
+	&& str_contains($update, '$this->get_slot_with_course($target_slot_id, true)')
 	&& str_contains($update, '$this->assert_slot_capacity_available($slot);'),
 	'Das Reaktivieren einer Anmeldung ist nicht atomar gegen eine volle Slot-Kapazität abgesichert.'
 );

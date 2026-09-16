@@ -1394,9 +1394,11 @@ class FLZ_AGS_Plugin
         $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_GET['school_year']))) : flz_ags_current_school_year();
 
         $registrations = array();
+        $slots = array();
         $load_failed = false;
         try {
             $registrations = FLZ_AGS_Registration::find_for_admin($school_year, 'all');
+            $slots = $this->get_public_slots($school_year);
         } catch (Throwable $error) {
             $load_failed = true;
             flz_ags_log_error($error, 'Laden der AG-Anmeldungen im Backend');
@@ -1426,6 +1428,7 @@ class FLZ_AGS_Plugin
         flz_ags_render_backend_template('registrations', array(
             'school_year' => $school_year,
             'registrations' => $registrations,
+            'slots' => $slots,
             'csv_report' => $csv_report,
         ));
         echo '</div>';
@@ -1438,31 +1441,83 @@ class FLZ_AGS_Plugin
 
         $registration_id = isset($_POST['registration_id']) ? absint($_POST['registration_id']) : 0;
         $new_status = isset($_POST['new_status']) ? sanitize_key(wp_unslash($_POST['new_status'])) : '';
+        $target_course_id = isset($_POST['course_id']) ? absint($_POST['course_id']) : 0;
+        $target_slot_id = isset($_POST['slot_id']) ? absint($_POST['slot_id']) : 0;
+        $class_name = isset($_POST['class_name'])
+            ? flz_ags_normalize_class_name(sanitize_text_field(wp_unslash($_POST['class_name'])))
+            : '';
+        $first_name = isset($_POST['student_first_name']) ? sanitize_text_field(wp_unslash($_POST['student_first_name'])) : '';
+        $last_name = isset($_POST['student_last_name']) ? sanitize_text_field(wp_unslash($_POST['student_last_name'])) : '';
+        $student_email = isset($_POST['student_email']) ? sanitize_email(wp_unslash($_POST['student_email'])) : '';
 
-        if ($registration_id <= 0 || !array_key_exists($new_status, flz_ags_status_labels())) {
+        if (
+            $registration_id <= 0
+            || $target_course_id <= 0
+            || $target_slot_id <= 0
+            || !array_key_exists($new_status, flz_ags_status_labels())
+            || !flz_ags_is_valid_class($class_name)
+            || $first_name === ''
+            || $last_name === ''
+            || !is_email($student_email)
+        ) {
             wp_die(esc_html__('Ungültige Anfrage.', 'flz-ags'));
         }
 
         try {
             FLZ_AGS_Model::transaction(
-                function () use ($registration_id, $new_status): void {
+                function () use ($registration_id, $new_status, $target_course_id, $target_slot_id, $class_name, $first_name, $last_name, $student_email): void {
                     $registration = FLZ_AGS_Registration::get_by_id($registration_id);
                     if (!$registration instanceof FLZ_AGS_Registration) {
                         throw new UnexpectedValueException('Die zu aktualisierende AG-Anmeldung wurde nicht gefunden.');
                     }
 
-                    if ('active' === $new_status && 'active' !== $registration->status) {
-                        $slot = $this->get_slot_with_course((int) $registration->slot_id, true);
-                        if (!$slot) {
-                            throw new UnexpectedValueException('Der zugehörige AG-Slot wurde nicht gefunden.');
+                    $slot = $this->get_slot_with_course($target_slot_id, true);
+                    if (
+                        !$slot
+                        || (int) $slot->course_id !== $target_course_id
+                        || $slot->school_year !== $registration->school_year
+                        || empty($slot->is_active)
+                        || empty($slot->course_active)
+                    ) {
+                        throw new UnexpectedValueException('Der gewählte AG-Slot ist nicht verfügbar.');
+                    }
+                    if (!flz_ags_grade_is_allowed($class_name, (string) $slot->allowed_grades, !empty($slot->only_grade_7))) {
+                        throw new UnexpectedValueException('Der gewählte AG-Slot ist für die angegebene Klasse nicht freigegeben.');
+                    }
+
+                    if ('active' === $new_status) {
+                        $active = FLZ_AGS_Registration::find_active_for_student(
+                            (string) $registration->school_year,
+                            $class_name,
+                            $first_name,
+                            $last_name
+                        );
+                        if ($active instanceof FLZ_AGS_Registration && $active->id !== $registration->id) {
+                            throw new UnexpectedValueException('Für diese Schüler*in existiert in diesem Schuljahr bereits eine andere aktive AG-Anmeldung.');
                         }
+                    }
+
+                    if (
+                        'active' === $new_status
+                        && ('active' !== $registration->status || (int) $slot->id !== (int) $registration->slot_id)
+                    ) {
                         $this->assert_slot_capacity_available($slot);
                     }
 
+                    $registration->course_id = (int) $slot->course_id;
+                    $registration->slot_id = (int) $slot->id;
+                    $registration->class_name = $class_name;
+                    $registration->grade_key = flz_ags_extract_grade_key($class_name);
+                    $registration->student_first_name = $first_name;
+                    $registration->student_last_name = $last_name;
+                    $registration->student_email = $student_email;
                     $registration->status = $new_status;
                     $registration->updated_at = current_time('mysql');
                     if ($new_status === 'withdrawn') {
                         $registration->withdrawn_at = current_time('mysql');
+                    } else {
+                        $registration->withdrawn_at = null;
+                        $registration->withdrawn_reason = null;
                     }
                     $registration->save();
                 },
