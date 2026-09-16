@@ -905,6 +905,25 @@ class FLZ_AGS_Plugin
         return FLZ_AGS_Registration::count_by(array('slot_id' => $slot_id, 'status' => 'active'));
     }
 
+    /**
+     * Verweigert eine weitere aktive Anmeldung, wenn der bereits gesperrte Slot voll ist.
+     *
+     * Der Aufrufer muss den Slot innerhalb einer Transaktion mit FOR UPDATE geladen haben,
+     * damit Zählung und anschließendes Speichern nicht konkurrieren können.
+     */
+    private function assert_slot_capacity_available(object $slot): void
+    {
+        $max_participants = (int) ($slot->max_participants ?? 0);
+        if ($max_participants <= 0) {
+            return;
+        }
+
+        $taken = $this->count_active_registrations((int) $slot->id);
+        if ($taken >= $max_participants) {
+            throw new UnexpectedValueException('Dieser AG-Slot ist inzwischen ausgebucht.');
+        }
+    }
+
     private function get_public_slots(string $school_year): array
     {
         return FLZ_AGS_Slot::find_public_for_school_year($school_year);
@@ -1288,9 +1307,10 @@ class FLZ_AGS_Plugin
                         return array('success' => false, 'messages' => array('Dieser AG-Slot ist für den gewählten Jahrgang nicht freigegeben.'));
                     }
 
-                    $taken = $this->count_active_registrations((int) $slot->id);
-                    if ((int) $slot->max_participants > 0 && $taken >= (int) $slot->max_participants) {
-                        return array('success' => false, 'messages' => array('Dieser AG-Slot ist inzwischen ausgebucht.'));
+                    try {
+                        $this->assert_slot_capacity_available($slot);
+                    } catch (UnexpectedValueException $error) {
+                        return array('success' => false, 'messages' => array($error->getMessage()));
                     }
 
                     $duplicate = FLZ_AGS_Registration::count_by(array(
@@ -1424,16 +1444,30 @@ class FLZ_AGS_Plugin
         }
 
         try {
-            $registration = FLZ_AGS_Registration::get_by_id($registration_id);
-            if (!$registration instanceof FLZ_AGS_Registration) {
-                throw new UnexpectedValueException('Die zu aktualisierende AG-Anmeldung wurde nicht gefunden.');
-            }
-            $registration->status = $new_status;
-            $registration->updated_at = current_time('mysql');
-            if ($new_status === 'withdrawn') {
-                $registration->withdrawn_at = current_time('mysql');
-            }
-            $registration->save();
+            FLZ_AGS_Model::transaction(
+                function () use ($registration_id, $new_status): void {
+                    $registration = FLZ_AGS_Registration::get_by_id($registration_id);
+                    if (!$registration instanceof FLZ_AGS_Registration) {
+                        throw new UnexpectedValueException('Die zu aktualisierende AG-Anmeldung wurde nicht gefunden.');
+                    }
+
+                    if ('active' === $new_status && 'active' !== $registration->status) {
+                        $slot = $this->get_slot_with_course((int) $registration->slot_id, true);
+                        if (!$slot) {
+                            throw new UnexpectedValueException('Der zugehörige AG-Slot wurde nicht gefunden.');
+                        }
+                        $this->assert_slot_capacity_available($slot);
+                    }
+
+                    $registration->status = $new_status;
+                    $registration->updated_at = current_time('mysql');
+                    if ($new_status === 'withdrawn') {
+                        $registration->withdrawn_at = current_time('mysql');
+                    }
+                    $registration->save();
+                },
+                'Aktualisieren des Status einer AG-Anmeldung'
+            );
         } catch (Throwable $error) {
             $this->redirect_admin_error(
                 $error,
@@ -1882,6 +1916,11 @@ class FLZ_AGS_Plugin
                     continue;
                 }
 
+                $slot = $this->get_slot_with_course((int) $slot->id, true);
+                if (!$slot instanceof FLZ_AGS_Slot) {
+                    throw new UnexpectedValueException('Der zugehörige AG-Slot wurde nicht gefunden.');
+                }
+
                 $record = array(
                     'course_id' => (int) $course->id,
                     'slot_id' => (int) $slot->id,
@@ -1910,6 +1949,10 @@ class FLZ_AGS_Plugin
                         ++$report['skipped'];
                         $report['warnings'][] = 'Zeile ' . $line . ' wurde übersprungen: Für diese Schüler*in besteht bereits eine andere aktive Anmeldung im Schuljahr.';
                         continue;
+                    }
+
+                    if (!$existing instanceof FLZ_AGS_Registration || 'active' !== $existing->status) {
+                        $this->assert_slot_capacity_available($slot);
                     }
                 }
 
