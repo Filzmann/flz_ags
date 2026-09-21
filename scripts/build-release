@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo="$(cd "$(dirname "$0")/.." && pwd)"
+workspace="${TAGORE_WORDPRESS_WORKSPACE:-$(cd "$repo/../.." && pwd)}"
+builder="$workspace/scripts/build-component-release"
+
+[[ $# -eq 1 ]] || { echo 'Aufruf: scripts/build-release <Ausgabeverzeichnis>' >&2; exit 2; }
+[[ -x "$builder" ]] || { echo "Kanonischer Release-Builder fehlt: $builder" >&2; exit 1; }
+
+exec "$builder" "$(basename "$repo")" "$repo" "$1"

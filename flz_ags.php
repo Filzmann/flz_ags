@@ -1,24 +1,27 @@
 <?php
 /**
  * Plugin Name: FLZ AG-Verwaltung
- * Description: Verwaltung und Anmeldung für Arbeitsgemeinschaften mit Schuljahr, Vorschaubildern, wöchentlichen Slots, Klassenlogik, Demo-Setup und CSV-Export.
- * Version: 0.3.10
+ * Description: Verwaltung und Anmeldung für Arbeitsgemeinschaften mit Schuljahr, Vorschaubildern, wöchentlichen Slots, Klassenlogik, Demo-Setup sowie CSV-Import und -Export.
+ * Version: 0.7.0
  * Author: Tagore-Gymnasium / Simon
  * Text Domain: flz-ags
  * Requires Plugins: flz_wpdb_objects, flz_ui_components
+ * Requires at least: 6.5
+ * Requires PHP: 8.1
  */
 
 defined('ABSPATH') || exit;
 
-define('FLZ_AGS_VERSION', '0.3.10');
+define('FLZ_AGS_VERSION', '0.7.0');
+define('FLZ_AGS_DB_VERSION', '2.1.0');
 define('FLZ_AGS_FILE', __FILE__);
 define('FLZ_AGS_DIR', plugin_dir_path(__FILE__));
 define('FLZ_AGS_URL', plugins_url('flz_ags/'));
 
 require_once FLZ_AGS_DIR . 'includes/helpers.php';
 
-const FLZ_AGS_MIN_WPDB_OBJECTS_VERSION = '1.4.0';
-const FLZ_AGS_MIN_UI_COMPONENTS_VERSION = '0.1.11';
+const FLZ_AGS_MIN_WPDB_OBJECTS_VERSION = '2.0.0';
+const FLZ_AGS_MIN_UI_COMPONENTS_VERSION = '0.2.0';
 
 function flz_ags_dependencies_available(): bool
 {
@@ -58,6 +61,9 @@ function flz_ags_bootstrap(): bool
     require_once FLZ_AGS_DIR . 'includes/models/class-flz-ags-course.php';
     require_once FLZ_AGS_DIR . 'includes/models/class-flz-ags-slot.php';
     require_once FLZ_AGS_DIR . 'includes/models/class-flz-ags-registration.php';
+    require_once FLZ_AGS_DIR . 'includes/class-flz-ags-course-csv.php';
+    require_once FLZ_AGS_DIR . 'includes/class-flz-ags-registration-csv.php';
+    require_once FLZ_AGS_DIR . 'includes/privacy.php';
     require_once FLZ_AGS_DIR . 'activate-deactivate.php';
     require_once FLZ_AGS_DIR . 'backend/backend.php';
     require_once FLZ_AGS_DIR . 'frontend/frontend.php';
@@ -91,7 +97,16 @@ function flz_ags_activate_plugin(): void
     flz_ags_activate();
 }
 
+function flz_ags_deactivate_plugin(): void
+{
+    if (!function_exists('flz_ags_deactivate')) {
+        require_once FLZ_AGS_DIR . 'activate-deactivate.php';
+    }
+    flz_ags_deactivate();
+}
+
 register_activation_hook(__FILE__, 'flz_ags_activate_plugin');
+register_deactivation_hook(__FILE__, 'flz_ags_deactivate_plugin');
 add_action('plugins_loaded', 'flz_ags_bootstrap', 20);
 
 if (did_action('plugins_loaded')) {

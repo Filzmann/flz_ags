@@ -18,6 +18,7 @@ class FLZ_AGS_Course extends FLZ_AGS_Model
     public ?int $detail_page_id;
     public ?string $category;
     public ?string $leader_name;
+    public ?int $leader_user_id;
     public ?string $allowed_grades;
     public ?int $only_grade_7;
     public ?int $is_active;
@@ -27,6 +28,8 @@ class FLZ_AGS_Course extends FLZ_AGS_Model
     public ?string $created_at;
     public ?string $updated_at;
     public array $slots = array();
+    public string $registration_html = '';
+    public bool $registration_panel_open = false;
 
     public function __construct(array $data = array())
     {
@@ -40,6 +43,7 @@ class FLZ_AGS_Course extends FLZ_AGS_Model
         $this->detail_page_id = isset($data['detail_page_id']) ? (int) $data['detail_page_id'] : 0;
         $this->category = $data['category'] ?? null;
         $this->leader_name = $data['leader_name'] ?? null;
+        $this->leader_user_id = isset($data['leader_user_id']) ? (int) $data['leader_user_id'] : 0;
         $this->allowed_grades = $data['allowed_grades'] ?? '';
         $this->only_grade_7 = isset($data['only_grade_7']) ? (int) $data['only_grade_7'] : 0;
         $this->is_active = isset($data['is_active']) ? (int) $data['is_active'] : 1;
@@ -58,6 +62,46 @@ class FLZ_AGS_Course extends FLZ_AGS_Model
             . ' ORDER BY sort_order ASC, title ASC';
 
         return static::query_models($sql, array($school_year), 'Laden der AGs für ein Schuljahr');
+    }
+
+    public static function find_by_school_year_and_slug(string $school_year, string $slug): ?self
+    {
+        $sql = 'SELECT * FROM ' . static::table_name()
+            . ' WHERE school_year = %s AND slug = %s ORDER BY id ASC LIMIT 2';
+        $models = static::query_models($sql, array($school_year, $slug), 'Auflösen einer AG für den Anmeldungs-Import');
+        if (count($models) > 1) {
+            throw new UnexpectedValueException('Der AG-Slug ist im Schuljahr nicht eindeutig.');
+        }
+        return $models[0] ?? null;
+    }
+
+    /** @return array<int,self> */
+    public static function find_for_leader(string $school_year, int $leader_user_id): array
+    {
+        $sql = 'SELECT * FROM ' . static::table_name()
+            . ' WHERE school_year = %s AND leader_user_id = %d ORDER BY sort_order ASC, title ASC';
+        return static::query_models($sql, array($school_year, $leader_user_id), 'Laden der zugewiesenen AGs');
+    }
+
+    /**
+     * Liefert alle in AG-Datensätzen vorhandenen Schuljahre.
+     *
+     * @return array<int,string>
+     */
+    public static function find_school_years(): array
+    {
+        $sql = 'SELECT DISTINCT school_year FROM ' . static::table_name()
+            . " WHERE school_year <> '' ORDER BY school_year DESC";
+        $rows = static::query_rows($sql, array(), 'Laden der vorhandenen AG-Schuljahre');
+        $school_years = array();
+
+        foreach ($rows as $row) {
+            if (is_object($row) && isset($row->school_year)) {
+                $school_years[] = (string) $row->school_year;
+            }
+        }
+
+        return $school_years;
     }
 
     public static function find_public_by_detail_page_id(int $detail_page_id, string $school_year): ?self
@@ -83,6 +127,7 @@ class FLZ_AGS_Course extends FLZ_AGS_Model
             detail_page_id bigint(20) unsigned NULL,
             category varchar(190) NULL,
             leader_name varchar(190) NULL,
+            leader_user_id bigint(20) unsigned NULL,
             allowed_grades varchar(100) NOT NULL DEFAULT '',
             only_grade_7 tinyint(1) NOT NULL DEFAULT 0,
             is_active tinyint(1) NOT NULL DEFAULT 1,
@@ -95,6 +140,7 @@ class FLZ_AGS_Course extends FLZ_AGS_Model
             KEY school_year (school_year),
             KEY slug (slug),
             KEY detail_page_id (detail_page_id),
+            KEY leader_user_id (leader_user_id),
             KEY active_visible (is_active, is_visible)
         )";
     }
@@ -118,6 +164,7 @@ class FLZ_AGS_Course extends FLZ_AGS_Model
             'detail_page_id' => $this->detail_page_id,
             'category' => $this->category,
             'leader_name' => $this->leader_name,
+            'leader_user_id' => $this->leader_user_id,
             'allowed_grades' => $this->allowed_grades,
             'only_grade_7' => $this->only_grade_7,
             'is_active' => $this->is_active,

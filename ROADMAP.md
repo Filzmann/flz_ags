@@ -2,33 +2,45 @@
 
 ## Prüfstatus
 
-**Teilweise regelkonform / P1.** Das Plugin hat die stärkste aktuelle
-Sicherheitsbasis: Admin-/AJAX-Pfade prüfen Capability und Nonce, der CSV-Export
-wird direkt gestreamt, Kapazität wird unter einer Slot-Sperre geprüft,
-Abhängigkeiten werden defensiv gemeldet und der Modell-Smoke besteht. Offen sind
-vor allem Datenschutzlebenszyklus, Migrationsnachweise, vollständige
-Nebenläufigkeitsinvarianten und echte WordPress-/UI-Tests.
+**Funktionsstand 0.6.2 ohne offene P0-/P1-Befunde; Release-Gate in
+Übernahmephase 5 bereit.** Admin-/AJAX-
+Pfade prüfen Capability und Nonce, CSV wird direkt gestreamt, Kapazität unter
+Slot-Sperre geprüft und aktive Mehrfachanmeldung durch einen eindeutigen
+Datenbankvertrag verhindert. Datenschutz, kurzlebige Mail-Capture-Diagnose und
+DB-Upgrade sind umgesetzt. Fast-Checks, reale lokale Bestandsmigration und
+Aktivieren–Deaktivieren–Aktivieren sind grün. PR-/Main-CI, branchgleiche
+Shared-Plugins und die Ratschen von 16,47 Prozent PHP sowie 41,46 Prozent
+JavaScript sind remote enforced; Ziel bleiben je 85 Prozent. Der
+reproduzierbare ZIP-Builder ist konfiguriert. Die manuelle Gesamtentscheidung
+für 0.6.2 wurde am 9. September 2026 vom Auftraggeber beauftragt; der technische
+Artefaktnachweis wird über Manifest und SHA-256 dem Updatepaket beigelegt. Das
+Protokoll liegt unter `docs/manual-acceptance.md`.
 
 ## P1
 
-1. CSV-Import und -Export als versionierten Roundtrip-Vertrag ergänzen: AGs
-   einschließlich Slots sowie Anmeldungen jeweils mit Dry-Run, Referenz-,
-   Duplikat-, Kapazitäts- und Rollbacktests. Exporte direkt streamen.
-2. Aufbewahrungs-, Auskunfts-, Widerrufs-, Anonymisierungs- und Löschvertrag für
-   Schülerdaten definieren; WordPress-Privacy-Exporter/-Eraser und eine
-   idempotente schuljahrbezogene Löschroutine ergänzen.
-3. DB-Schemaversion von der allgemeinen Plugin-Version trennen. Jede Änderung
-   als benannten, additiven Upgradepfad mit Frischinstallations-, Upgrade-,
-   Wiederholungs- und synthetischem Bestandsdatentest ausführen.
-4. Eindeutigkeit einer aktiven Anmeldung pro Schüler/Schuljahr auch bei
-   parallelen Anmeldungen in verschiedenen Slots garantieren. Slot-Sperre allein
-   serialisiert diesen Fall nicht; geeigneten Schlüssel/Lock-Vertrag plus
-   Negativtest festlegen.
-5. Lokale Mock-Mails mit personenbezogenen Formularwerten nur kurzlebig und
-   löschbar speichern; keine Übernahme in andere Umgebungen, Backups oder Logs.
+1. CSV-Roundtrip vervollständigen: **AGs einschließlich Slots und Anmeldungen
+   erledigt** mit
+   versioniertem Direktdownload, fehlertolerantem Direktimport, aussagekräftigem
+   Importbericht, optionalem Slot-Export, wählbarer Schuljahrübernahme sowie
+   transaktionaler Übernahme. Für den Anmeldungs-Restore bleiben echte
+   WordPress-Integrations- und Rollbacktests offen.
+2. **Erledigt:** Aufbewahrung ist standardmäßig deaktiviert; bestätigte
+   manuelle Löschung sowie WordPress-Privacy-Exporter/-Eraser sind vorhanden.
+3. **Erledigt:** DB-Version 2.0.0 ist getrennt und wird additiv, idempotent und
+   konfliktbewusst migriert; Frisch-, Upgrade- und Wiederholungsfälle sind
+   durch Smokes und lokalen Bestand belegt.
+4. **Erledigt:** `active_student_key` plus eindeutiger Index garantiert die
+   Eindeutigkeit einer aktiven Anmeldung pro Schüler*in/Schuljahr auch über
+   verschiedene Slots; der Konfliktfall ist getestet.
+5. **Erledigt:** Die Mail-Capture-Ausweichlösung enthält keine
+   personenbezogenen Formularwerte mehr, läuft nach höchstens einer Stunde ab
+   und ist im Backend sofort löschbar.
 6. **Erledigt:** Direkte Includes aus Shared-Plugin-Verzeichnissen durch deren
    öffentliche, versionierte Bootstrap-/API-Verträge ersetzt und mit einem
    Verbraucher-Smoke abgesichert.
+7. **Erledigt:** Neue Demo-AGs übernehmen keine Titel, Freitexte,
+   Leitungsnamen oder Bilder aus veröffentlichten Seiten. Ein Privacy-Smoke
+   sichert die synthetischen Felder; bestehende Datensätze bleiben unangetastet.
 
 ## P2
 

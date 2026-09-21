@@ -1,6 +1,123 @@
-# FLZ AG-Verwaltung 0.3.10
+# FLZ AG-Verwaltung 0.7.0
 
 Initiale WordPress-Plugin-Version für AG-Verwaltung und AG-Anmeldung.
+
+Commit-, CI- und Coverage-Gates sind enforced. Das
+[Abnahmeprotokoll](docs/manual-acceptance.md) führt Installation, Upgrade,
+Nebenläufigkeit, CSV, Datenschutz, Mail, Oberfläche und Rückbau zusammen.
+
+Ein sauberer Commit wird reproduzierbar paketiert mit:
+
+```bash
+./scripts/build-release /tmp/flz_ags-release
+```
+
+## Neu in 0.7.0
+
+- Die WordPress-Rolle „AG-Leiter“ erhält eine schreibgeschützte Ansicht der
+  Anmeldungen ihrer im AG-Formular zugeordneten AGs.
+- Die Einstellungen erlauben optional mehrere AG-Anmeldungen je Schüler*in
+  und Schuljahr; eine doppelte aktive Anmeldung in derselben AG bleibt
+  ausgeschlossen.
+- Der öffentliche Anmeldedrawer zeigt keinen Raum mehr, liegt bei geöffnetem
+  Formular über dem Header und enthält einen konfigurierbaren Hinweis, der
+  standardmäßig auf die Gültigkeit für ein Schulhalbjahr hinweist.
+
+## Neu in 0.6.2
+
+- Die Backend-Anmeldungstabelle bietet Filter in sämtlichen Spaltenköpfen.
+- Schüler*in, Klasse, AG, Slot, E-Mail, Status und Datum lassen sich direkt im
+  Tabellenkopf auf- und absteigend sortieren; die reine Aktionsspalte bleibt
+  bewusst unsortierbar.
+
+## Neu in 0.6.1
+
+- Die öffentliche AG-Liste kann nach Bereich, Klassenstufe, Dozent und
+  Wochentag gefiltert, durchsucht und sortiert werden. Die Bedienung liegt in
+  einem einklappbaren Filterbereich.
+- Die Admin-Liste bietet Filter und auf-/absteigende Sortierung direkt in den
+  fachlichen Tabellenköpfen.
+- Inhaltsabhängige Asset-Versionen verhindern, dass Browser nach einem Update
+  veraltetes JavaScript oder CSS weiterverwenden.
+
+## Neu in 0.6.0
+
+- Eine von der Plugin-Version getrennte DB-Version 2.0.0 führt den additiven,
+  idempotenten Upgradepfad für bestehende Registrierungen.
+- Ein datenschutzfreundlicher fachlicher Schlüssel und ein eindeutiger
+  Datenbankindex garantieren höchstens eine aktive Anmeldung pro
+  Schüler*in/Schuljahr – auch über verschiedene Slots hinweg.
+- WordPress-Privacy-Exporter und -Eraser liefern beziehungsweise löschen alle
+  Anmeldungen einer E-Mail-Adresse transaktional.
+- Die lokale Mail-Capture-Ausweichlösung speichert keine Empfänger-, Namens-,
+  Klassen-, Betreff- oder Nachrichtendaten mehr. Ein technischer Hinweis läuft
+  nach höchstens einer Stunde ab und kann im Backend sofort gelöscht werden.
+- Die lokale Bestandsmigration bewahrte 8 AGs, 10 Slots und 2 Anmeldungen; die
+  Deaktivierung änderte diese Daten nicht.
+
+## Neu in 0.5.0
+
+- Der Anmeldungs-Download ist ein versioniertes, wiederherstellbares Backup und
+  enthält unabhängig vom Tabellenfilter alle Status des gewählten Schuljahrs.
+- Anmeldungs-Backups können direkt hochgeladen werden. Portable AG- und
+  Terminschlüssel ersetzen installationsabhängige IDs; nicht auflösbare Zeilen
+  werden mit Zeilennummer übersprungen und ungefährliche Lücken mit sicheren
+  Platzhaltern ergänzt.
+- Wiederholte Imports aktualisieren identische Backupdatensätze, versenden keine
+  Bestätigungsmails und schützen eine bereits vorhandene andere aktive
+  Anmeldung derselben Schüler*in.
+- In den Einstellungen kann eine Aufbewahrungsfrist von 1 bis 120 Monaten
+  aktiviert werden. Sie ist standardmäßig ausgeschaltet und zählt immer ab dem
+  ursprünglichen Anmeldedatum.
+- Ein täglicher WordPress-Cron-Job löscht abgelaufene Anmeldungen nur bei
+  aktivierter Regel. Eine zusätzlich bestätigte manuelle Löschung zeigt die
+  Anzahl dauerhaft gelöschter Datensätze; die Deaktivierung des Plugins löscht
+  keine Daten.
+
+## Neu in 0.4.0
+
+- AG-Stammdaten und zugehörige Termine lassen sich als versionierte CSV-Datei
+  exportieren und wieder importieren.
+- Beim Export entscheidet eine standardmäßig aktivierte Checkbox, ob Termine
+  beziehungsweise Slots enthalten sein sollen. Der Import erkennt beide
+  Varianten automatisch.
+- Der Import aktualisiert oder ergänzt Datensätze über portable fachliche
+  Schlüssel; nicht aufgeführte AGs und Termine bleiben erhalten.
+- Beim Import können die Schuljahre der CSV beibehalten oder alle enthaltenen
+  AGs samt Slots einem ausgewählten Zielschuljahr zugeordnet werden. Kollidiert
+  dabei derselbe Slug aus mehreren Quelljahren, gewinnt das neueste Quelljahr
+  und der ausgelassene Datensatz wird gemeldet.
+- Der Upload importiert brauchbare Datensätze direkt. Fehlende optionale Werte
+  erhalten sichere Standardwerte; fehlerhafte oder doppelte Einzelzeilen werden
+  ausgelassen, ohne die übrige Datei zu verwerfen.
+- Nach dem Import zeigt die AG-Verwaltung eine Bilanz und zeilenbezogene Hinweise
+  zu allen Korrekturen und ausgelassenen Datensätzen.
+- Capability, Nonce und Grundformat werden serverseitig geprüft; alle
+  akzeptierten Datensätze werden gemeinsam in einer Transaktion übernommen.
+
+## Neu in 0.3.13
+
+- Bei AGs ohne Detailseite öffnet der primäre Detailbutton „Anmeldung“ das
+  Anmeldeformular im gleichen zugänglichen Drawer wie der Floating-Button
+  einer Detailseite. Er entspricht optisch dem regulären Button „Details und
+  Anmeldung“ einer AG mit Detailseite.
+- Das Formular wird nicht mehr sichtbar unter der AG-Karte angehängt.
+- „AG speichern“ verwendet das Speichern-Icon, „Speichern und neu“ ein
+  kombiniertes Disketten-/Plus-Icon.
+
+## Neu in 0.3.12
+
+- AGs ohne gültige Detailseite zeigen bei geöffneter Anmeldung das
+  Anmeldeformular direkt unter der AG-Karte in der öffentlichen Liste.
+- Auf Listen mit mehreren Formularen werden POST-Daten nur im Formular der
+  tatsächlich abgesendeten AG verarbeitet und wieder angezeigt.
+
+## Neu in 0.3.11
+
+- Die Gutenberg-Blöcke bieten vorhandene AG-Schuljahre als Dropdown an.
+- Das Standardschuljahr wechselt mit Beginn der amtlichen Berliner
+  Sommerferien auf das kommende Schuljahr. Die veröffentlichten Termine bis
+  2030 sind hinterlegt; für spätere Jahre bleibt der 1. August der Fallback.
 
 ## Neu in 0.3.10
 
@@ -112,14 +229,13 @@ Initiale WordPress-Plugin-Version für AG-Verwaltung und AG-Anmeldung.
 - CSV-Exporte werden vor dem Senden vollständig geprüft. Führende
   Tabellenkalkulations-Formeln in Nutzwerten werden neutralisiert.
 
-### Einmaliger Migrationshinweis
+### Historischer Migrationshinweis
 
-Die Version ist noch nicht produktiv. Deshalb findet bewusst **keine
-Datenmigration** aus den bisherigen Tabellen `{prefix}flz_ag_courses`,
-`{prefix}flz_ag_slots` und `{prefix}flz_ag_registrations` statt. Der laufende
-Code kennt nur noch die modellabgeleiteten Tabellen. Falls lokale Altbestände
-aus Zwischenständen vorhanden sind, können sie in der nicht produktiven
-Entwicklungsumgebung gezielt manuell entfernt werden.
+Die alten Zwischenstandstabellen `{prefix}flz_ag_courses`,
+`{prefix}flz_ag_slots` und `{prefix}flz_ag_registrations` sind nicht Teil des
+aktuellen DB-2.0-Vertrags. Der Upgradepfad verändert oder löscht sie nicht. Der
+laufende Code verwendet ausschließlich die modellabgeleiteten Tabellen; eine
+spätere Bereinigung alter Zwischenstände benötigt eine gesonderte Freigabe.
 
 Die Shortcodes, Optionen und Administrations-URLs bleiben unverändert. Das
 Plugin setzt `flz_wpdb_objects` voraus; WordPress erhält diese Abhängigkeit
@@ -205,7 +321,11 @@ Danach im Backend:
 
 - Datenschutzhinweis der Schule für AG-Anmeldungen ergänzen/verlinken.
 - Festlegen, wer Anmeldungen sehen/exportieren darf. Aktuell: `manage_options`, per Filter änderbar.
-- Lösch-/Anonymisierungsfrist nach Schuljahr definieren. Eine automatische Löschroutine ist in 0.2.0 noch nicht enthalten.
+- Die schulische Löschfrist festlegen und unter `FLZ AGs → Einstellungen`
+  aktivieren. Standard sind 24 Monate ab Anmeldedatum; die Automatik ist bis
+  zur bewussten Aktivierung ausgeschaltet.
+- Vor einer manuellen Löschung bei Bedarf auf `FLZ AGs → Anmeldungen` ein
+  vollständiges CSV-Backup des betreffenden Schuljahrs herunterladen.
 - E-Mail-Zustellbarkeit auf Staging prüfen; lokal werden Mails über DDEV
   abgefangen.
 - Kein externes Captcha, keine Akismet-Weitergabe von Anmeldedaten.
@@ -215,6 +335,5 @@ Danach im Backend:
 
 - Wartelistenautomatik
 - Frontend-Widerruf durch Eltern/Schüler*innen
-- automatische Löschroutine
 - Import bestehender AG-Seiten
 - erweiterte Rollenverwaltung

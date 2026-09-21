@@ -3,8 +3,10 @@
 defined('ABSPATH') || exit;
 
 $ui = flz_ui();
+$registration_form_notice = flz_ags_registration_form_notice();
 ?>
 <?php echo $ui->form_start(array('method' => 'post', 'class' => 'flz-ags-registration-form', 'nonce' => 'flz_ags_frontend_registration', 'nonce_name' => 'flz_ags_nonce', 'hidden' => array('flz_ags_registration_submit' => '1', 'flz_ags_course_id' => (int) $course->id), 'attrs' => array('data-flz-ags-registration-form' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formular. ?>
+	<p class="flz-ags-registration-notice"><strong><?php echo wp_kses_post($registration_form_notice); ?></strong></p>
 	<div class="flz-ags-form-grid">
 		<?php echo $ui->field(array('type' => 'select', 'name' => 'class_name', 'label' => 'Klasse', 'value' => $posted['class_name'], 'required' => true, 'placeholder' => '– Bitte auswählen –', 'options' => flz_ags_class_options(), 'attrs' => array('data-flz-ags-class-select' => true))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
 		<?php echo $ui->input('text', array('name' => 'student_first_name', 'label' => 'Vorname Schüler*in', 'value' => $posted['student_first_name'], 'required' => true)); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>

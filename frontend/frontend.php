@@ -28,10 +28,11 @@ function flz_ags_get_frontend_template(string $template, array $vars = array()):
 /**
  * Rendert die öffentlichen Filter für Listen oder Anmeldeformular.
  */
-function flz_ags_render_frontend_filters(bool $include_classes): void
+function flz_ags_render_frontend_filters(bool $include_classes, array $courses = array()): void
 {
     flz_ags_render_frontend_template('filters', array(
         'include_classes' => $include_classes,
+        'courses' => $courses,
     ));
 }
 
@@ -40,8 +41,29 @@ function flz_ags_render_frontend_filters(bool $include_classes): void
  */
 function flz_ags_render_course_card(object $course): void
 {
+    $card_args = flz_ags_course_card_args($course);
+    $filter_attrs = isset($card_args['attrs']) && is_array($card_args['attrs']) ? $card_args['attrs'] : array();
+    unset($card_args['attrs']);
+    $registration_html = (string) ($course->registration_html ?? '');
+    $registration_panel_html = '';
+
+    if ($registration_html !== '') {
+        $registration_panel_html = flz_ui()->floating_action_panel(array(
+            'id' => 'flz-ags-list-registration-' . (int) $course->id,
+            'title' => 'AG-Anmeldung: ' . (string) $course->title,
+            'button_label' => 'Anmeldung',
+            'button_icon' => 'view',
+            'button_variant' => 'primary',
+            'content' => $registration_html,
+            'open' => !empty($course->registration_panel_open),
+            'class' => 'flz-ags-registration-panel flz-ags-card-registration-panel',
+        ));
+    }
+
     flz_ags_render_frontend_template('course-card', array(
-        'card_args' => flz_ags_course_card_args($course),
+        'card_args' => $card_args,
+        'filter_attrs' => $filter_attrs,
+        'registration_panel_html' => $registration_panel_html,
     ));
 }
 
@@ -84,6 +106,18 @@ function flz_ags_course_card_args(object $course): array
     $target = $course->only_grade_7
         ? 'nur Klasse 7'
         : flz_ags_allowed_grades_label((string) $course->allowed_grades);
+    $allowed_grades = flz_ags_sanitize_allowed_grades((string) $course->allowed_grades);
+    $grade_keys = $allowed_grades !== '' ? array_map('intval', explode(',', $allowed_grades)) : array();
+    $sort_grade = !empty($course->only_grade_7) ? 7 : (!empty($grade_keys) ? min($grade_keys) : 0);
+    $sort_weekday = !empty($weekdays) ? min(array_map('intval', $weekdays)) : 99;
+    $search_text = implode(' ', array(
+        (string) $course->title,
+        (string) $course->category,
+        (string) $course->leader_name,
+        (string) $course->short_description,
+        $target,
+        implode(' ', $slot_lines),
+    ));
     $meta = array();
     if (!empty($course->category)) {
         $meta['Bereich'] = $course->category;
@@ -118,6 +152,15 @@ function flz_ags_course_card_args(object $course): array
             'data-only-grade-7'        => (int) $course->only_grade_7,
             'data-allowed-grades'      => $course->allowed_grades,
             'data-full'                => $all_full ? '1' : '0',
+            'data-leader'              => (string) $course->leader_name,
+            'data-category'            => (string) $course->category,
+            'data-search'              => $search_text,
+            'data-sort-default'        => (int) $course->sort_order,
+            'data-sort-title'          => (string) $course->title,
+            'data-sort-category'       => (string) $course->category,
+            'data-sort-grade'          => $sort_grade,
+            'data-sort-leader'         => (string) $course->leader_name,
+            'data-sort-weekday'        => $sort_weekday,
         ),
         'image_url' => flz_ags_course_image_url($course->image_url ?? ''),
         'image_alt' => (string) $course->title,

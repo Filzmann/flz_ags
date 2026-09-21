@@ -105,6 +105,21 @@ flz_ags_test_check(
 	'Die AG-Abfrage verwendet nicht die abgeleitete Tabelle.'
 );
 
+$wpdb->results = array(
+	(object) array( 'school_year' => '2026/2027' ),
+	(object) array( 'school_year' => '2025/2026' ),
+);
+$school_years = FLZ_AGS_Course::find_school_years();
+flz_ags_test_check(
+	array( '2026/2027', '2025/2026' ) === $school_years,
+	'Die vorhandenen Schuljahre werden nicht als skalare Liste geliefert.'
+);
+flz_ags_test_check(
+	str_contains( $wpdb->last_query, 'SELECT DISTINCT school_year' )
+	&& str_contains( $wpdb->last_query, 'ORDER BY school_year DESC' ),
+	'Die Schuljahrliste wird nicht dedupliziert und absteigend sortiert.'
+);
+
 $wpdb->results = array();
 FLZ_AGS_Slot::find_public_for_school_year( '2026/2027' );
 flz_ags_test_check(

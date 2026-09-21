@@ -9,6 +9,254 @@
     return strings[key] || fallback;
   }
 
+  function normalizeListValue(value) {
+    value = String(value || '').toLocaleLowerCase('de');
+    return typeof value.normalize === 'function'
+      ? value.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      : value;
+  }
+
+  function listIncludes(list, value) {
+    return String(list || '').split(',').map(function (item) {
+      return item.trim();
+    }).filter(Boolean).indexOf(String(value)) !== -1;
+  }
+
+  function applyAdminCourseList(scope) {
+    var searchInput = scope.querySelector('[data-flz-ags-admin-search]');
+    var categorySelect = scope.querySelector('[data-flz-ags-admin-category]');
+    var gradeSelect = scope.querySelector('[data-flz-ags-admin-grade]');
+    var leaderSelect = scope.querySelector('[data-flz-ags-admin-leader]');
+    var weekdaySelect = scope.querySelector('[data-flz-ags-admin-weekday]');
+    var container = scope.querySelector('[data-flz-ags-admin-items]');
+    var status = scope.querySelector('[data-flz-ags-admin-results-status]');
+    var noResults = scope.querySelector('[data-flz-ags-admin-no-results]');
+    var searchTerm = searchInput ? normalizeListValue(searchInput.value.trim()) : '';
+    var category = categorySelect ? normalizeListValue(categorySelect.value) : '';
+    var grade = gradeSelect ? gradeSelect.value : '';
+    var leader = leaderSelect ? normalizeListValue(leaderSelect.value) : '';
+    var weekday = weekdaySelect ? weekdaySelect.value : '';
+    var sortKey = scope.flzAgsSortKey || 'default';
+    var sortDirection = scope.flzAgsSortDirection === 'descending' ? -1 : 1;
+    var allowedSorts = ['default', 'title', 'category', 'grade', 'leader', 'weekday'];
+    var items = Array.prototype.slice.call(scope.querySelectorAll('[data-flz-ags-admin-item]'));
+    var visibleCount = 0;
+
+    if (allowedSorts.indexOf(sortKey) === -1) sortKey = 'default';
+
+    items.sort(function (left, right) {
+      var attribute = 'data-sort-' + sortKey;
+      var leftValue = left.getAttribute(attribute) || '';
+      var rightValue = right.getAttribute(attribute) || '';
+      var numeric = sortKey === 'default' || sortKey === 'grade' || sortKey === 'weekday';
+      var comparison = numeric
+        ? Number(leftValue) - Number(rightValue)
+        : normalizeListValue(leftValue).localeCompare(normalizeListValue(rightValue), 'de');
+
+      if (comparison === 0 && sortKey !== 'title') {
+        comparison = normalizeListValue(left.getAttribute('data-sort-title')).localeCompare(normalizeListValue(right.getAttribute('data-sort-title')), 'de');
+      }
+      return comparison * sortDirection;
+    });
+
+    scope.querySelectorAll('[data-flz-ags-admin-sort-button]').forEach(function (button) {
+      var header = button.closest('th');
+      var active = button.getAttribute('data-flz-ags-admin-sort-button') === sortKey;
+
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      if (header) header.setAttribute('aria-sort', active ? (sortDirection === 1 ? 'ascending' : 'descending') : 'none');
+    });
+
+    items.forEach(function (item) {
+      var details = scope.querySelector('[data-flz-ui-editable-details-for="' + item.id + '"]');
+      var allowedGrades = item.getAttribute('data-allowed-grades') || '';
+      var show = true;
+
+      if (category) show = normalizeListValue(item.getAttribute('data-category')) === category;
+      if (grade) {
+        show = show && (item.getAttribute('data-only-grade-7') === '1'
+          ? grade === '7'
+          : (!allowedGrades || listIncludes(allowedGrades, grade)));
+      }
+      if (show && weekday) show = listIncludes(item.getAttribute('data-weekdays'), weekday);
+      if (show && leader) show = normalizeListValue(item.getAttribute('data-leader')) === leader;
+      if (show && searchTerm) show = normalizeListValue(item.getAttribute('data-search')).indexOf(searchTerm) !== -1;
+
+      item.hidden = !show;
+      if (show) visibleCount += 1;
+
+      if (details) {
+        if (!show && !details.hidden) {
+          details.setAttribute('data-flz-ags-filter-hidden', 'true');
+          details.hidden = true;
+        } else if (show && details.getAttribute('data-flz-ags-filter-hidden') === 'true') {
+          details.removeAttribute('data-flz-ags-filter-hidden');
+          details.hidden = false;
+        }
+      }
+
+      if (container) {
+        container.appendChild(item);
+        if (details) container.appendChild(details);
+      }
+    });
+
+    if (noResults) noResults.hidden = visibleCount !== 0 || items.length === 0;
+    if (status) status.textContent = visibleCount + (visibleCount === 1 ? ' AG angezeigt.' : ' AGs angezeigt.');
+  }
+
+  function initAdminCourseLists() {
+    if (!document.querySelectorAll) return;
+
+    document.querySelectorAll('[data-flz-ags-admin-list]').forEach(function (scope) {
+      scope.querySelectorAll('[data-flz-ags-admin-search]').forEach(function (control) {
+        control.addEventListener('input', function () { applyAdminCourseList(scope); });
+      });
+      scope.querySelectorAll('[data-flz-ags-admin-category], [data-flz-ags-admin-grade], [data-flz-ags-admin-leader], [data-flz-ags-admin-weekday]').forEach(function (control) {
+        control.addEventListener('change', function () { applyAdminCourseList(scope); });
+      });
+      scope.querySelectorAll('[data-flz-ags-admin-sort-button]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var sortKey = button.getAttribute('data-flz-ags-admin-sort-button');
+          var allowedSorts = ['title', 'category', 'grade', 'leader', 'weekday'];
+
+          if (allowedSorts.indexOf(sortKey) === -1) return;
+
+          if (scope.flzAgsSortKey === sortKey) {
+            scope.flzAgsSortDirection = scope.flzAgsSortDirection === 'ascending' ? 'descending' : 'ascending';
+          } else {
+            scope.flzAgsSortKey = sortKey;
+            scope.flzAgsSortDirection = 'ascending';
+          }
+          applyAdminCourseList(scope);
+        });
+      });
+      applyAdminCourseList(scope);
+    });
+  }
+
+  function applyAdminRegistrationList(scope) {
+    var container = scope.querySelector('[data-flz-ags-registration-items]');
+    var status = scope.querySelector('[data-flz-ags-registration-results-status]');
+    var noResults = scope.querySelector('[data-flz-ags-registration-no-results]');
+    var filters = Array.prototype.slice.call(scope.querySelectorAll('[data-flz-ags-registration-filter]'));
+    var items = Array.prototype.slice.call(scope.querySelectorAll('[data-flz-ags-registration-item]'));
+    var allowedSorts = ['default', 'student', 'class', 'course', 'slot', 'email', 'status', 'date'];
+    var sortKey = scope.flzAgsRegistrationSortKey || 'default';
+    var sortDirection = scope.flzAgsRegistrationSortDirection === 'descending' ? -1 : 1;
+    var visibleCount = 0;
+
+    if (allowedSorts.indexOf(sortKey) === -1) sortKey = 'default';
+
+    items.sort(function (left, right) {
+      var leftValue = left.getAttribute('data-sort-' + sortKey) || '';
+      var rightValue = right.getAttribute('data-sort-' + sortKey) || '';
+      var numeric = sortKey === 'default';
+      var comparison = numeric
+        ? Number(leftValue) - Number(rightValue)
+        : normalizeListValue(leftValue).localeCompare(normalizeListValue(rightValue), 'de', {numeric: true});
+
+      if (comparison === 0 && sortKey !== 'student') {
+        comparison = normalizeListValue(left.getAttribute('data-sort-student')).localeCompare(normalizeListValue(right.getAttribute('data-sort-student')), 'de');
+      }
+      return comparison * sortDirection;
+    });
+
+    scope.querySelectorAll('[data-flz-ags-registration-sort]').forEach(function (button) {
+      var header = button.closest('th');
+      var active = button.getAttribute('data-flz-ags-registration-sort') === sortKey;
+
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      if (header) header.setAttribute('aria-sort', active ? (sortDirection === 1 ? 'ascending' : 'descending') : 'none');
+    });
+
+    items.forEach(function (item) {
+      var show = filters.every(function (control) {
+        var key = control.getAttribute('data-flz-ags-registration-filter');
+        var selected = normalizeListValue(control.value).trim();
+        var current = normalizeListValue(item.getAttribute('data-filter-' + key));
+
+        if (!selected) return true;
+        return control.getAttribute('data-flz-ags-filter-mode') === 'contains'
+          ? current.indexOf(selected) !== -1
+          : current === selected;
+      });
+
+      item.hidden = !show;
+      if (show) visibleCount += 1;
+      if (container) container.appendChild(item);
+    });
+
+    if (container && noResults) container.appendChild(noResults);
+    if (noResults) noResults.hidden = visibleCount !== 0 || items.length === 0;
+    if (status) status.textContent = visibleCount + (visibleCount === 1 ? ' Anmeldung angezeigt.' : ' Anmeldungen angezeigt.');
+  }
+
+  function initAdminRegistrationLists() {
+    if (!document.querySelectorAll) return;
+
+    document.querySelectorAll('[data-flz-ags-registration-list]').forEach(function (scope) {
+      scope.querySelectorAll('[data-flz-ags-registration-filter]').forEach(function (control) {
+        var eventName = control.getAttribute('data-flz-ags-filter-mode') === 'contains' ? 'input' : 'change';
+        control.addEventListener(eventName, function () { applyAdminRegistrationList(scope); });
+      });
+      scope.querySelectorAll('[data-flz-ags-registration-sort]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var sortKey = button.getAttribute('data-flz-ags-registration-sort');
+          var allowedSorts = ['student', 'class', 'course', 'slot', 'email', 'status', 'date'];
+
+          if (allowedSorts.indexOf(sortKey) === -1) return;
+
+          if (scope.flzAgsRegistrationSortKey === sortKey) {
+            scope.flzAgsRegistrationSortDirection = scope.flzAgsRegistrationSortDirection === 'ascending' ? 'descending' : 'ascending';
+          } else {
+            scope.flzAgsRegistrationSortKey = sortKey;
+            scope.flzAgsRegistrationSortDirection = 'ascending';
+          }
+          applyAdminRegistrationList(scope);
+        });
+      });
+      applyAdminRegistrationList(scope);
+    });
+  }
+
+  function resetRegistrationSlotOptions(courseSelect) {
+    var row = courseSelect.closest('[data-flz-ui-editable-row]');
+    var slotSelect = row && row.querySelector('[data-flz-ags-registration-slot]');
+    var rawMap = slotSelect && slotSelect.getAttribute('data-flz-ags-registration-slot-map');
+    var slotMap = {};
+    var courseId = courseSelect.value;
+
+    if (!slotSelect) return;
+
+    try {
+      slotMap = rawMap ? JSON.parse(rawMap) : {};
+    } catch (error) {
+      slotMap = {};
+    }
+
+    while (slotSelect.firstChild) {
+      slotSelect.removeChild(slotSelect.firstChild);
+    }
+
+    slotSelect.appendChild(new Option('Bitte einen freien Slot auswählen', ''));
+    Object.keys(slotMap[courseId] || {}).forEach(function (slotId) {
+      slotSelect.appendChild(new Option(slotMap[courseId][slotId], slotId));
+    });
+    slotSelect.value = '';
+    slotSelect.disabled = Object.keys(slotMap[courseId] || {}).length === 0;
+  }
+
+  function initAdminRegistrationSlotSelectors() {
+    if (!document.querySelectorAll) return;
+
+    document.querySelectorAll('[data-flz-ags-registration-course]').forEach(function (courseSelect) {
+      courseSelect.addEventListener('change', function () {
+        resetRegistrationSlotOptions(courseSelect);
+      });
+    });
+  }
+
   function setPageMessage($field, message, isError) {
     var $results = $field.find('[data-flz-ags-page-results]');
     $results.empty().append(
@@ -206,4 +454,8 @@
       $button.prop('disabled', false);
     });
   });
+
+  initAdminCourseLists();
+  initAdminRegistrationLists();
+  initAdminRegistrationSlotSelectors();
 }(jQuery));

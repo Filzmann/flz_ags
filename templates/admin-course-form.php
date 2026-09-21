@@ -3,6 +3,12 @@
 defined('ABSPATH') || exit;
 
 $ui = flz_ui();
+$leader_options = array('0' => 'Nicht zugewiesen');
+foreach (get_users(array('role' => flz_ags_leader_role_slug(), 'orderby' => 'display_name', 'order' => 'ASC')) as $leader_user) {
+    if ($leader_user instanceof WP_User) {
+        $leader_options[(string) $leader_user->ID] = $leader_user->display_name . ' (' . $leader_user->user_login . ')';
+    }
+}
 
 $admin_text_row = static function (string $label, string $name, string $value, string $description = '') use ($ui): void {
     echo '<tr><th scope="row"><label for="' . esc_attr($name) . '">' . esc_html($label) . '</label></th><td>';
@@ -88,7 +94,7 @@ $admin_detail_page_row = static function (?object $course) use ($admin_page_pick
         $detail_page_id,
         'Keine Detailseite ausgewählt.',
         'AG-Detailseite suchen',
-        'Die Anmeldung wird automatisch auf dieser AG-Detailseite angezeigt. Neue Detailseiten werden als Unterseite der eingestellten AG-Hauptseite veröffentlicht.',
+        'Optional. Die Anmeldung wird automatisch auf dieser AG-Detailseite angezeigt. Neue Detailseiten werden als Unterseite der eingestellten AG-Hauptseite veröffentlicht.',
         true,
         'Neue Detailseite anlegen',
         '#title'
@@ -133,6 +139,14 @@ if (empty($slot_rows)) {
 			$admin_text_row('Titel', 'title', $course->title ?? '', 'Pflichtfeld');
 			$admin_text_row('Bereich/Kategorie', 'category', $course->category ?? '', 'z. B. Sport, Musik, Naturwissenschaften');
 			$admin_text_row('Leitung', 'leader_name', $course->leader_name ?? '', 'Name oder Funktionsbezeichnung');
+			?>
+			<tr>
+				<th scope="row"><label for="flz_ags_leader_user_id">WordPress-AG-Leiter</label></th>
+				<td>
+					<?php echo $ui->field(array('type' => 'select', 'name' => 'leader_user_id', 'id' => 'flz_ags_leader_user_id', 'label' => 'WordPress-AG-Leiter', 'value' => (string) ($course->leader_user_id ?? 0), 'options' => $leader_options, 'description' => 'Dieser Benutzer darf die Anmeldungen ausschließlich für diese AG lesen. Die Rolle „AG-Leiter“ wird über WordPress-Benutzerrollen vergeben.')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+				</td>
+			</tr>
+			<?php
 			$admin_image_row('Vorschaubild', 'image_url', $course->image_url ?? '');
 			$admin_detail_page_row($course);
 			$admin_textarea_row('Kurzbeschreibung', 'short_description', $course->short_description ?? '', 3);
@@ -179,5 +193,9 @@ if (empty($slot_rows)) {
 	));
 	// phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
 	?>
-	<p><?php echo $ui->button_save(array('label' => 'AG speichern')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?></p>
+	<p>
+		<?php echo $ui->button_save(array('label' => 'AG speichern')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+		<?php echo $ui->button_save(array('label' => 'Speichern und schließen', 'class' => 'flz-ags-save-and-close', 'type' => 'submit', 'attrs' => array('name' => 'save_and_close', 'value' => '1'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+		<?php echo $ui->button_save(array('label' => 'Speichern und neu', 'class' => 'flz-ags-save-and-new', 'type' => 'submit', 'attrs' => array('name' => 'save_and_new', 'value' => '1'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+	</p>
 <?php echo $ui->form_end(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formularende. ?>
