@@ -1,4 +1,4 @@
-# FLZ AG-Verwaltung 0.7.0
+# FLZ AG-Verwaltung 0.7.1
 
 Initiale WordPress-Plugin-Version für AG-Verwaltung und AG-Anmeldung.
 

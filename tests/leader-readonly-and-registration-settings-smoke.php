@@ -35,6 +35,9 @@ foreach (array(
     'registration_form_notice' => $form,
     'wp_kses_post($registration_form_notice)' => $form,
     'z-index: 2001' => $css,
+    '.flz-ags-registration-panel.is-open,' => $css,
+    '.flz-ags-registration-panel:target {' => $css,
+    'z-index: 2003 !important' => $css,
     'flz_ags_create_leader_role' => $activation,
 ) as $needle => $source) {
     if (!str_contains($source, $needle)) {

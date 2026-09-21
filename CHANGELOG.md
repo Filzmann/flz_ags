@@ -5,6 +5,11 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 
 ## Unreleased
 
+## 0.7.1 – 2026-09-21
+
+- Das geöffnete AG-Anmeldepanel hebt nun seinen eigenen Stacking-Context über
+  den Sticky Header, sodass Formular und Overlay zuverlässig darüber liegen.
+
 ## 0.7.0 – 2026-09-21
 
 - Rolle „AG-Leiter“ ergänzt. Über einen WordPress-Benutzer je AG zugeordnet,

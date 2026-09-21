@@ -488,6 +488,14 @@ th[aria-sort="descending"] .flz-ags-admin-sort-button::after {
   margin-top: 0;
 }
 
+.flz-ags-registration-panel.is-open,
+.flz-ags-registration-panel:target {
+  /* Der Parent bildet einen eigenen Stacking-Context; seine Ebene muss den
+   * Sticky-Header (z-index: 2000) überholen, damit Drawer und Scrim sichtbar
+   * darüber liegen. */
+  z-index: 2003 !important;
+}
+
 .flz-ags-registration-panel .flz-ui-floating-panel__trigger {
   right: auto;
   bottom: clamp(5.25rem, 10vh, 7.5rem);
