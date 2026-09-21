@@ -5,6 +5,11 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 
 ## Unreleased
 
+## 0.7.2 – 2026-09-21
+
+- Im AG-Anmeldepanel wird die Formularüberschrift nicht mehr doppelt
+  angezeigt; der zugängliche Panel-Titel bleibt erhalten.
+
 ## 0.7.1 – 2026-09-21
 
 - Das geöffnete AG-Anmeldepanel hebt nun seinen eigenen Stacking-Context über

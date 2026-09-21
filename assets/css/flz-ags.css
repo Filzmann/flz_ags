@@ -488,6 +488,10 @@ th[aria-sort="descending"] .flz-ags-admin-sort-button::after {
   margin-top: 0;
 }
 
+.flz-ags-registration-panel .flz-ags-registration > h2 {
+  display: none;
+}
+
 .flz-ags-registration-panel.is-open,
 .flz-ags-registration-panel:target {
   /* Der Parent bildet einen eigenen Stacking-Context; seine Ebene muss den
