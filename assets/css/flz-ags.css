@@ -535,6 +535,12 @@ th[aria-sort="descending"] .flz-ags-admin-sort-button::after {
   border-right: 1px solid var(--flz-ui-color-border);
   border-left: 0;
   box-shadow: 0.8rem 0 2rem rgba(0, 0, 0, 0.18);
+  z-index: 2002 !important;
+}
+
+.flz-ags-registration-panel.is-open .flz-ui-floating-panel__scrim,
+.flz-ags-registration-panel:target .flz-ui-floating-panel__scrim {
+  z-index: 2001 !important;
 }
 
 @keyframes flz-ags-registration-pulse {

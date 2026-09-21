@@ -99,6 +99,26 @@ $page_picker_row = static function (
         </section>
 
         <section class="flz-ags-settings-card">
+            <h2>Anmeldung</h2>
+            <table class="form-table" role="presentation">
+                <tbody>
+                    <tr>
+                        <th scope="row">Mehrfachanmeldung</th>
+                        <td>
+                            <?php echo $ui->field(array('type' => 'checkbox', 'name' => 'multiple_registrations_enabled', 'label' => 'Mehrere AG-Anmeldungen pro Schüler*in und Schuljahr erlauben', 'checked' => flz_ags_multiple_registrations_enabled(), 'description' => 'Ist diese Option aus, bleibt genau eine aktive AG-Anmeldung pro Schüler*in und Schuljahr erlaubt. Dieselbe AG kann nie doppelt aktiv gebucht werden.')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="flz_ags_registration_form_notice">Hinweis im Anmeldeformular</label></th>
+                        <td>
+                            <?php echo $ui->field(array('type' => 'textarea', 'name' => 'registration_form_notice', 'id' => 'flz_ags_registration_form_notice', 'label' => 'Hinweis im Anmeldeformular', 'value' => flz_ags_registration_form_notice(), 'rows' => 3, 'description' => 'Dieser Hinweis wird oberhalb der Felder im öffentlichen Anmeldeformular angezeigt.')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="flz-ags-settings-card">
             <h2>Datenschutz und Aufbewahrung</h2>
             <p class="description">Die Frist zählt immer ab dem ursprünglichen Anmeldedatum. Ein Widerruf oder eine spätere Bearbeitung verlängert sie nicht.</p>
             <table class="form-table" role="presentation">

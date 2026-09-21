@@ -155,21 +155,16 @@ class FLZ_AGS_Plugin
     public function register_admin_menu(): void
     {
         $capability = flz_ags_manage_capability();
+        if (current_user_can($capability)) {
+            add_menu_page('FLZ AGs', 'FLZ AGs', $capability, 'flz-ags', array($this, 'render_admin_courses_page'), 'dashicons-groups', 26);
+            add_submenu_page('flz-ags', 'AGs', 'AGs', $capability, 'flz-ags', array($this, 'render_admin_courses_page'));
+            add_submenu_page('flz-ags', 'Anmeldungen', 'Anmeldungen', $capability, 'flz-ags-registrations', array($this, 'render_admin_registrations_page'));
+            add_submenu_page('flz-ags', 'Demo-Setup', 'Demo-Setup', $capability, 'flz-ags-demo', array($this, 'render_admin_demo_page'));
+            add_submenu_page('flz-ags', 'Einstellungen', 'Einstellungen', $capability, 'flz-ags-settings', array($this, 'render_admin_settings_page'));
+            return;
+        }
 
-        add_menu_page(
-            'FLZ AGs',
-            'FLZ AGs',
-            $capability,
-            'flz-ags',
-            array($this, 'render_admin_courses_page'),
-            'dashicons-groups',
-            26
-        );
-
-        add_submenu_page('flz-ags', 'AGs', 'AGs', $capability, 'flz-ags', array($this, 'render_admin_courses_page'));
-        add_submenu_page('flz-ags', 'Anmeldungen', 'Anmeldungen', $capability, 'flz-ags-registrations', array($this, 'render_admin_registrations_page'));
-        add_submenu_page('flz-ags', 'Demo-Setup', 'Demo-Setup', $capability, 'flz-ags-demo', array($this, 'render_admin_demo_page'));
-        add_submenu_page('flz-ags', 'Einstellungen', 'Einstellungen', $capability, 'flz-ags-settings', array($this, 'render_admin_settings_page'));
+        add_menu_page('Meine AG-Anmeldungen', 'Meine AGs', flz_ags_view_assigned_courses_capability(), 'flz-ags-registrations', array($this, 'render_admin_registrations_page'), 'dashicons-groups', 26);
     }
 
     private function assert_admin_permission(): void
@@ -183,6 +178,18 @@ class FLZ_AGS_Plugin
     {
         if (!current_user_can(flz_ags_manage_capability())) {
             wp_send_json_error(array('message' => 'Keine Berechtigung.'), 403);
+        }
+    }
+
+    private function is_manager(): bool
+    {
+        return current_user_can(flz_ags_manage_capability());
+    }
+
+    private function assert_registration_read_permission(): void
+    {
+        if (!$this->is_manager() && !current_user_can(flz_ags_view_assigned_courses_capability())) {
+            wp_die(esc_html__('Keine Berechtigung.', 'flz-ags'));
         }
     }
 
@@ -563,6 +570,7 @@ class FLZ_AGS_Plugin
                 'detail_page_id' => $detail_page_id,
                 'category' => isset($_POST['category']) ? sanitize_text_field(wp_unslash($_POST['category'])) : '',
                 'leader_name' => isset($_POST['leader_name']) ? sanitize_text_field(wp_unslash($_POST['leader_name'])) : '',
+                'leader_user_id' => isset($_POST['leader_user_id']) ? absint($_POST['leader_user_id']) : 0,
                 'allowed_grades' => isset($_POST['allowed_grades']) ? flz_ags_sanitize_allowed_grades(sanitize_text_field(wp_unslash($_POST['allowed_grades']))) : '',
                 'only_grade_7' => isset($_POST['only_grade_7']) ? 1 : 0,
                 'is_active' => isset($_POST['is_active']) ? 1 : 0,
@@ -571,6 +579,10 @@ class FLZ_AGS_Plugin
                 'sort_order' => isset($_POST['sort_order']) ? intval($_POST['sort_order']) : 0,
                 'updated_at' => $now,
             );
+
+            if ($data['leader_user_id'] > 0 && !user_can($data['leader_user_id'], flz_ags_view_assigned_courses_capability())) {
+                throw new UnexpectedValueException('Die ausgewählte AG-Leitung besitzt nicht die Rolle AG-Leiter.');
+            }
 
             $course_id = FLZ_AGS_Model::transaction(
                 function () use ($course_id, $data, $slots, $school_year, $now): int {
@@ -773,6 +785,10 @@ class FLZ_AGS_Plugin
         $retention_months = isset($_POST['registration_retention_months'])
             ? max(1, min(120, absint(wp_unslash($_POST['registration_retention_months']))))
             : 24;
+        $multiple_registrations_enabled = isset($_POST['multiple_registrations_enabled']) ? 1 : 0;
+        $registration_form_notice = isset($_POST['registration_form_notice'])
+            ? wp_kses_post(wp_unslash($_POST['registration_form_notice']))
+            : 'Die AG-Anmeldung gilt nur für ein Schulhalbjahr.';
 
         try {
             if ($parent_page_id > 0) {
@@ -785,6 +801,8 @@ class FLZ_AGS_Plugin
             update_option('flz_ags_parent_page_id', $parent_page_id, false);
             update_option('flz_ags_registration_retention_months', $retention_months, false);
             update_option('flz_ags_registration_retention_enabled', $retention_enabled, false);
+            update_option('flz_ags_multiple_registrations_enabled', $multiple_registrations_enabled, false);
+            update_option('flz_ags_registration_form_notice', $registration_form_notice, false);
         } catch (Throwable $error) {
             $this->redirect_admin_error(
                 $error,
@@ -1231,11 +1249,7 @@ class FLZ_AGS_Plugin
                 'image_alt' => (string) $slot->title,
                 'title'     => $time_label,
                 'kicker'    => $target_label,
-                'meta'      => array(
-                    'Zeit'   => $time_label,
-                    'Raum'   => $slot->room,
-                    'Plätze' => $free_label,
-                ),
+                'meta'      => array('Zeit' => $time_label, 'Plätze' => $free_label),
                 'badge'     => $is_full ? 'ausgebucht' : '',
             );
         }
@@ -1313,13 +1327,17 @@ class FLZ_AGS_Plugin
                         return array('success' => false, 'messages' => array($error->getMessage()));
                     }
 
-                    $duplicate = FLZ_AGS_Registration::count_by(array(
+                    $duplicate_criteria = array(
                         'school_year' => $school_year,
                         'class_name' => $class_name,
                         'student_first_name' => $first_name,
                         'student_last_name' => $last_name,
                         'status' => 'active',
-                    ));
+                    );
+                    if (flz_ags_multiple_registrations_enabled()) {
+                        $duplicate_criteria['course_id'] = (int) $slot->course_id;
+                    }
+                    $duplicate = FLZ_AGS_Registration::count_by($duplicate_criteria);
                     if ($duplicate > 0) {
                         return array(
                             'success' => false,
@@ -1389,28 +1407,34 @@ class FLZ_AGS_Plugin
 
     public function render_admin_registrations_page(): void
     {
-        $this->assert_admin_permission();
+        $this->assert_registration_read_permission();
 
         $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_GET['school_year']))) : flz_ags_current_school_year();
 
         $registrations = array();
         $slots = array();
+        $courses = array();
         $load_failed = false;
         try {
-            $registrations = FLZ_AGS_Registration::find_for_admin($school_year, 'all');
-            $slots = $this->get_public_slots($school_year);
+            if ($this->is_manager()) {
+                $registrations = FLZ_AGS_Registration::find_for_admin($school_year, 'all');
+                $slots = $this->get_public_slots($school_year);
+            } else {
+                $registrations = FLZ_AGS_Registration::find_for_leader($school_year, get_current_user_id());
+                $courses = FLZ_AGS_Course::find_for_leader($school_year, get_current_user_id());
+            }
         } catch (Throwable $error) {
             $load_failed = true;
             flz_ags_log_error($error, 'Laden der AG-Anmeldungen im Backend');
         }
 
         echo '<div class="wrap flz-ags-admin">';
-        echo '<h1>AG-Anmeldungen</h1>';
+        echo '<h1>' . esc_html($this->is_manager() ? 'AG-Anmeldungen' : 'Meine AG-Anmeldungen') . '</h1>';
         if (isset($_GET['updated'])) {
             echo wp_kses_post(flz_ags_notice('Anmeldung aktualisiert.'));
         }
-        $csv_report = get_transient($this->registration_csv_report_key());
-        if (is_array($csv_report)) {
+        $csv_report = $this->is_manager() ? get_transient($this->registration_csv_report_key()) : null;
+        if ($this->is_manager() && is_array($csv_report)) {
             delete_transient($this->registration_csv_report_key());
         } else {
             $csv_report = null;
@@ -1425,10 +1449,11 @@ class FLZ_AGS_Plugin
             );
         }
 
-        flz_ags_render_backend_template('registrations', array(
+        flz_ags_render_backend_template($this->is_manager() ? 'registrations' : 'leader-registrations', array(
             'school_year' => $school_year,
             'registrations' => $registrations,
             'slots' => $slots,
+            'courses' => $courses,
             'csv_report' => $csv_report,
         ));
         echo '</div>';
@@ -1486,12 +1511,20 @@ class FLZ_AGS_Plugin
                     }
 
                     if ('active' === $new_status) {
-                        $active = FLZ_AGS_Registration::find_active_for_student(
-                            (string) $registration->school_year,
-                            $class_name,
-                            $first_name,
-                            $last_name
-                        );
+                        $active = flz_ags_multiple_registrations_enabled()
+                            ? FLZ_AGS_Registration::find_active_for_student_in_course(
+                                (string) $registration->school_year,
+                                (int) $slot->course_id,
+                                $class_name,
+                                $first_name,
+                                $last_name
+                            )
+                            : FLZ_AGS_Registration::find_active_for_student(
+                                (string) $registration->school_year,
+                                $class_name,
+                                $first_name,
+                                $last_name
+                            );
                         if ($active instanceof FLZ_AGS_Registration && $active->id !== $registration->id) {
                             throw new UnexpectedValueException('Für diese Schüler*in existiert in diesem Schuljahr bereits eine andere aktive AG-Anmeldung.');
                         }
@@ -1994,12 +2027,20 @@ class FLZ_AGS_Plugin
                 );
                 $existing = FLZ_AGS_Registration::find_backup_match($record);
                 if ('active' === $record['status']) {
-                    $active = FLZ_AGS_Registration::find_active_for_student(
-                        $record['school_year'],
-                        $record['class_name'],
-                        $record['student_first_name'],
-                        $record['student_last_name']
-                    );
+                    $active = flz_ags_multiple_registrations_enabled()
+                        ? FLZ_AGS_Registration::find_active_for_student_in_course(
+                            $record['school_year'],
+                            (int) $record['course_id'],
+                            $record['class_name'],
+                            $record['student_first_name'],
+                            $record['student_last_name']
+                        )
+                        : FLZ_AGS_Registration::find_active_for_student(
+                            $record['school_year'],
+                            $record['class_name'],
+                            $record['student_first_name'],
+                            $record['student_last_name']
+                        );
                     if ($active instanceof FLZ_AGS_Registration && (!$existing instanceof FLZ_AGS_Registration || $active->id !== $existing->id)) {
                         ++$report['skipped'];
                         $report['warnings'][] = 'Zeile ' . $line . ' wurde übersprungen: Für diese Schüler*in besteht bereits eine andere aktive Anmeldung im Schuljahr.';

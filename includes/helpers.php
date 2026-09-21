@@ -105,6 +105,29 @@ function flz_ags_manage_capability(): string
     return (string) apply_filters('flz_ags_manage_capability', 'manage_options');
 }
 
+function flz_ags_view_assigned_courses_capability(): string
+{
+    return 'flz_ags_view_assigned_courses';
+}
+
+function flz_ags_leader_role_slug(): string
+{
+    return 'flz_ags_leader';
+}
+
+function flz_ags_multiple_registrations_enabled(): bool
+{
+    return (bool) get_option('flz_ags_multiple_registrations_enabled', 0);
+}
+
+function flz_ags_registration_form_notice(): string
+{
+    return (string) get_option(
+        'flz_ags_registration_form_notice',
+        'Die AG-Anmeldung gilt nur für ein Schulhalbjahr.'
+    );
+}
+
 /**
  * Bestimmt das Backendziel nach dem Speichern einer AG.
  *

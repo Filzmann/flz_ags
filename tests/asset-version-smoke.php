@@ -6,7 +6,7 @@ if ( PHP_SAPI !== 'cli' ) {
 }
 
 define( 'ABSPATH', '/tmp/' );
-define( 'FLZ_AGS_VERSION', '0.6.2' );
+define( 'FLZ_AGS_VERSION', '0.7.0' );
 define( 'FLZ_AGS_DIR', dirname( __DIR__ ) . '/' );
 
 // Test-Exceptions werden ausschließlich von der CLI ausgewertet.

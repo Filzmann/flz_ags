@@ -3,6 +3,12 @@
 defined('ABSPATH') || exit;
 
 $ui = flz_ui();
+$leader_options = array('0' => 'Nicht zugewiesen');
+foreach (get_users(array('role' => flz_ags_leader_role_slug(), 'orderby' => 'display_name', 'order' => 'ASC')) as $leader_user) {
+    if ($leader_user instanceof WP_User) {
+        $leader_options[(string) $leader_user->ID] = $leader_user->display_name . ' (' . $leader_user->user_login . ')';
+    }
+}
 
 $admin_text_row = static function (string $label, string $name, string $value, string $description = '') use ($ui): void {
     echo '<tr><th scope="row"><label for="' . esc_attr($name) . '">' . esc_html($label) . '</label></th><td>';
@@ -133,6 +139,14 @@ if (empty($slot_rows)) {
 			$admin_text_row('Titel', 'title', $course->title ?? '', 'Pflichtfeld');
 			$admin_text_row('Bereich/Kategorie', 'category', $course->category ?? '', 'z. B. Sport, Musik, Naturwissenschaften');
 			$admin_text_row('Leitung', 'leader_name', $course->leader_name ?? '', 'Name oder Funktionsbezeichnung');
+			?>
+			<tr>
+				<th scope="row"><label for="flz_ags_leader_user_id">WordPress-AG-Leiter</label></th>
+				<td>
+					<?php echo $ui->field(array('type' => 'select', 'name' => 'leader_user_id', 'id' => 'flz_ags_leader_user_id', 'label' => 'WordPress-AG-Leiter', 'value' => (string) ($course->leader_user_id ?? 0), 'options' => $leader_options, 'description' => 'Dieser Benutzer darf die Anmeldungen ausschließlich für diese AG lesen. Die Rolle „AG-Leiter“ wird über WordPress-Benutzerrollen vergeben.')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+				</td>
+			</tr>
+			<?php
 			$admin_image_row('Vorschaubild', 'image_url', $course->image_url ?? '');
 			$admin_detail_page_row($course);
 			$admin_textarea_row('Kurzbeschreibung', 'short_description', $course->short_description ?? '', 3);

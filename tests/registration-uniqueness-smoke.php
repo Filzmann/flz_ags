@@ -17,10 +17,10 @@ foreach (
 	array(
 		'student_key char(64) NOT NULL' => $model,
 		'active_student_key char(64) NULL' => $model,
-		'UNIQUE KEY active_student_key' => $model,
+		'UNIQUE KEY active_student_course_key (active_student_key, course_id)' => $model,
 		'\'active\' === $this->status ? $this->student_key : null' => $model,
 		'flz_ags_registration_student_key' => $model,
-		'ADD UNIQUE KEY active_student_key' => $upgrade,
+		'ADD UNIQUE KEY active_student_course_key' => $upgrade,
 		'flz_ags_has_active_registration_conflict' => $controller,
 	) as $needle => $source
 ) {

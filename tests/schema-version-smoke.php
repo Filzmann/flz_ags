@@ -14,11 +14,12 @@ $upgrade = file_get_contents($root . '/activate-deactivate.php');
 
 foreach (
 	array(
-		"define('FLZ_AGS_VERSION', '0.6.2')" => $entrypoint,
-		"define('FLZ_AGS_DB_VERSION', '2.0.0')" => $entrypoint,
+		"define('FLZ_AGS_VERSION', '0.7.0')" => $entrypoint,
+		"define('FLZ_AGS_DB_VERSION', '2.1.0')" => $entrypoint,
 		"get_option('flz_ags_db_version'" => $upgrade,
 		"update_option('flz_ags_db_version', FLZ_AGS_DB_VERSION" => $upgrade,
 		'flz_ags_upgrade_registration_identity_v2' => $upgrade,
+		'flz_ags_upgrade_leader_assignment_and_multiple_registrations_v21' => $upgrade,
 	) as $needle => $source
 ) {
 	if (!is_string($source) || !str_contains($source, $needle)) {

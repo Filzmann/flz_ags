@@ -5,6 +5,15 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 
 ## Unreleased
 
+- Rolle „AG-Leiter“ ergänzt. Über einen WordPress-Benutzer je AG zugeordnet,
+  sieht sie ausschließlich die zugehörigen Anmeldungen und kann keine Daten
+  ändern, importieren oder exportieren.
+- Mehrfachanmeldungen sind im Backend je Schuljahr einstellbar. Bei Freigabe
+  bleiben doppelte aktive Anmeldungen derselben AG verhindert.
+- Raumangaben aus dem öffentlichen Anmeldeformular entfernt, das geöffnete
+  Formular über den Sticky Header gehoben und einen konfigurierbaren,
+  standardmäßig halbjahresbezogenen Hinweis ergänzt.
+
 ## 0.6.2 – 2026-09-09
 
 - Filter in allen Spaltenköpfen sowie auf-/absteigende Sortierung in allen

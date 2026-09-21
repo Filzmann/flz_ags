@@ -24,6 +24,7 @@ function flz_ags_create_model_tables(): void
 function flz_ags_activate(): void
 {
     flz_ags_maybe_upgrade();
+    flz_ags_create_leader_role();
     add_option('flz_ags_current_school_year', flz_ags_default_school_year());
     add_option('flz_ags_classes', flz_ags_default_classes());
     add_option('flz_ags_parent_page_id', flz_ags_detect_detail_parent_page_id());
@@ -51,6 +52,10 @@ function flz_ags_maybe_upgrade(): void
     }
     flz_ags_create_model_tables();
 
+    if (version_compare($installed, '2.1.0', '<')) {
+        flz_ags_upgrade_leader_assignment_and_multiple_registrations_v21();
+    }
+
     if (get_option('flz_ags_current_school_year', '') === '') {
         add_option('flz_ags_current_school_year', flz_ags_default_school_year());
     }
@@ -68,6 +73,9 @@ function flz_ags_maybe_upgrade(): void
 
     add_option('flz_ags_registration_retention_enabled', 0);
     add_option('flz_ags_registration_retention_months', 24);
+    add_option('flz_ags_multiple_registrations_enabled', 0);
+    add_option('flz_ags_registration_form_notice', 'Die AG-Anmeldung gilt nur für ein Schulhalbjahr.');
+    flz_ags_create_leader_role();
     if ((bool) get_option('flz_ags_registration_retention_enabled', 0)) {
         flz_ags_schedule_registration_cleanup();
     }
@@ -77,6 +85,58 @@ function flz_ags_maybe_upgrade(): void
     delete_option('flz_ags_mock_confirmation_mails');
 
     update_option('flz_ags_db_version', FLZ_AGS_DB_VERSION, false);
+}
+
+function flz_ags_create_leader_role(): void
+{
+    $role = get_role(flz_ags_leader_role_slug());
+    if (!$role instanceof WP_Role) {
+        add_role(
+            flz_ags_leader_role_slug(),
+            'AG-Leiter',
+            array('read' => true, flz_ags_view_assigned_courses_capability() => true)
+        );
+        return;
+    }
+    $role->add_cap('read');
+    $role->add_cap(flz_ags_view_assigned_courses_capability());
+}
+
+function flz_ags_upgrade_leader_assignment_and_multiple_registrations_v21(): void
+{
+    global $wpdb;
+
+    $course_table = $wpdb->prefix . 'flz_ags_courses';
+    $registration_table = $wpdb->prefix . 'flz_ags_registrations';
+
+    // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Feste Plugin-Tabellennamen mit WordPress-Präfix.
+    if (null === $wpdb->get_var($wpdb->prepare("SHOW COLUMNS FROM $course_table LIKE %s", 'leader_user_id'))) {
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Fester Plugin-Tabellenname mit WordPress-Präfix.
+        if (false === $wpdb->query("ALTER TABLE $course_table ADD leader_user_id bigint(20) unsigned NULL AFTER leader_name")) {
+            throw new RuntimeException('Der AG-Tabelle konnte keine WordPress-Leitungszuordnung hinzugefügt werden.');
+        }
+    }
+    // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Fester Plugin-Tabellenname mit WordPress-Präfix; der Indexname wird gebunden.
+    if (null === $wpdb->get_var($wpdb->prepare("SHOW INDEX FROM $course_table WHERE Key_name = %s", 'leader_user_id'))) {
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Fester Plugin-Tabellenname mit WordPress-Präfix.
+        if (false === $wpdb->query("ALTER TABLE $course_table ADD KEY leader_user_id (leader_user_id)")) {
+            throw new RuntimeException('Der Index für die AG-Leitungszuordnung konnte nicht eingerichtet werden.');
+        }
+    }
+    // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Fester Plugin-Tabellenname mit WordPress-Präfix; der Indexname wird gebunden.
+    if (null !== $wpdb->get_var($wpdb->prepare("SHOW INDEX FROM $registration_table WHERE Key_name = %s", 'active_student_key'))) {
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Fester Plugin-Tabellenname mit WordPress-Präfix.
+        if (false === $wpdb->query("ALTER TABLE $registration_table DROP INDEX active_student_key")) {
+            throw new RuntimeException('Die bisherige globale AG-Anmeldungseindeutigkeit konnte nicht umgestellt werden.');
+        }
+    }
+    // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Fester Plugin-Tabellenname mit WordPress-Präfix; der Indexname wird gebunden.
+    if (null === $wpdb->get_var($wpdb->prepare("SHOW INDEX FROM $registration_table WHERE Key_name = %s", 'active_student_course_key'))) {
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Fester Plugin-Tabellenname mit WordPress-Präfix.
+        if (false === $wpdb->query("ALTER TABLE $registration_table ADD UNIQUE KEY active_student_course_key (active_student_key, course_id)")) {
+            throw new RuntimeException('Die Eindeutigkeit je AG konnte nicht eingerichtet werden.');
+        }
+    }
 }
 
 function flz_ags_registration_table_exists(): bool

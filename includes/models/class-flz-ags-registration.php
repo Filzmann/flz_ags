@@ -102,6 +102,18 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
         );
     }
 
+    /** @return array<int,self> */
+    public static function find_for_leader(string $school_year, int $leader_user_id): array
+    {
+        $sql = 'SELECT r.*, c.title, c.slug, s.weekday, s.start_time, s.end_time, s.room '
+            . 'FROM ' . static::table_name() . ' r '
+            . 'INNER JOIN ' . FLZ_AGS_Course::table_name() . ' c ON c.id = r.course_id '
+            . 'INNER JOIN ' . FLZ_AGS_Slot::table_name() . ' s ON s.id = r.slot_id '
+            . 'WHERE r.school_year = %s AND c.leader_user_id = %d '
+            . 'ORDER BY c.title ASC, s.weekday ASC, r.class_name ASC, r.student_last_name ASC, r.student_first_name ASC';
+        return static::query_models($sql, array($school_year, $leader_user_id), 'Laden der zugewiesenen AG-Anmeldungen');
+    }
+
     public static function find_backup_match(array $data): ?self
     {
         $sql = 'SELECT * FROM ' . static::table_name()
@@ -132,6 +144,19 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
             $sql,
             array($school_year, $class_name, $first_name, $last_name),
             'Prüfen aktiver Anmeldungen während des Backup-Imports'
+        );
+        return $models[0] ?? null;
+    }
+
+    public static function find_active_for_student_in_course(string $school_year, int $course_id, string $class_name, string $first_name, string $last_name): ?self
+    {
+        $sql = 'SELECT * FROM ' . static::table_name()
+            . ' WHERE school_year = %s AND course_id = %d AND class_name = %s AND student_first_name = %s'
+            . ' AND student_last_name = %s AND status = \'active\' ORDER BY id ASC LIMIT 1';
+        $models = static::query_models(
+            $sql,
+            array($school_year, $course_id, $class_name, $first_name, $last_name),
+            'Prüfen aktiver Anmeldungen derselben AG'
         );
         return $models[0] ?? null;
     }
@@ -170,7 +195,7 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
             KEY school_year (school_year),
             KEY class_name (class_name),
             KEY status (status),
-            UNIQUE KEY active_student_key (active_student_key)
+            UNIQUE KEY active_student_course_key (active_student_key, course_id)
         )";
     }
 

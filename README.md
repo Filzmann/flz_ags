@@ -1,4 +1,4 @@
-# FLZ AG-Verwaltung 0.6.2
+# FLZ AG-Verwaltung 0.7.0
 
 Initiale WordPress-Plugin-Version für AG-Verwaltung und AG-Anmeldung.
 
@@ -11,6 +11,17 @@ Ein sauberer Commit wird reproduzierbar paketiert mit:
 ```bash
 ./scripts/build-release /tmp/flz_ags-release
 ```
+
+## Neu in 0.7.0
+
+- Die WordPress-Rolle „AG-Leiter“ erhält eine schreibgeschützte Ansicht der
+  Anmeldungen ihrer im AG-Formular zugeordneten AGs.
+- Die Einstellungen erlauben optional mehrere AG-Anmeldungen je Schüler*in
+  und Schuljahr; eine doppelte aktive Anmeldung in derselben AG bleibt
+  ausgeschlossen.
+- Der öffentliche Anmeldedrawer zeigt keinen Raum mehr, liegt bei geöffnetem
+  Formular über dem Header und enthält einen konfigurierbaren Hinweis, der
+  standardmäßig auf die Gültigkeit für ein Schulhalbjahr hinweist.
 
 ## Neu in 0.6.2
 
