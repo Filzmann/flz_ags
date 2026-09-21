@@ -5,6 +5,8 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 
 ## Unreleased
 
+## 0.7.0 – 2026-09-21
+
 - Rolle „AG-Leiter“ ergänzt. Über einen WordPress-Benutzer je AG zugeordnet,
   sieht sie ausschließlich die zugehörigen Anmeldungen und kann keine Daten
   ändern, importieren oder exportieren.
