@@ -1,4 +1,4 @@
-# FLZ AG-Verwaltung 0.7.2
+# FLZ AG-Verwaltung 0.7.3
 
 Initiale WordPress-Plugin-Version für AG-Verwaltung und AG-Anmeldung.
 
@@ -6,7 +6,13 @@ Commit-, CI- und Coverage-Gates sind enforced. Das
 [Abnahmeprotokoll](docs/manual-acceptance.md) führt Installation, Upgrade,
 Nebenläufigkeit, CSV, Datenschutz, Mail, Oberfläche und Rückbau zusammen.
 
+## Neu in 0.7.3
+
+- Die öffentliche Übersicht zeigt keine Räume. Die Bestätigungsmail nennt den hinterlegten Raum als Ersttreffpunkt; spätere Raumänderungen stimmen die AG-Leitungen direkt mit den Schüler*innen ab.
+- Der verbindliche, hervorgehobene Halbjahres-Hinweis mit dem nächsten Anmeldetermin erscheint immer über dem Anmeldeformular. Die Status im AG-Formular sind direkt erläutert.
+
 Ein sauberer Commit wird reproduzierbar paketiert mit:
+
 
 ```bash
 ./scripts/build-release /tmp/flz_ags-release

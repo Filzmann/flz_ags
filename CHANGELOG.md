@@ -5,6 +5,12 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 
 ## Unreleased
 
+## 0.7.3 – 2026-09-25
+
+- Raumangaben aus der öffentlichen AG-Übersicht entfernt; die Bestätigungsmail nennt den hinterlegten Raum ausschließlich als Ersttreffpunkt und verweist spätere Änderungen an die AG-Leitung.
+- Verbindlichen, hervorgehobenen Halbjahres-Hinweis mit dem nächsten Anmeldetermin ergänzt; optionale Zusatzhinweise bleiben möglich.
+- Die Status „aktiv“, „im Frontend sichtbar“ und „Anmeldung geöffnet“ direkt im AG-Formular erklärt.
+
 ## 0.7.2 – 2026-09-21
 
 - Im AG-Anmeldepanel wird die Formularüberschrift nicht mehr doppelt

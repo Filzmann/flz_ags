@@ -74,7 +74,7 @@ function flz_ags_maybe_upgrade(): void
     add_option('flz_ags_registration_retention_enabled', 0);
     add_option('flz_ags_registration_retention_months', 24);
     add_option('flz_ags_multiple_registrations_enabled', 0);
-    add_option('flz_ags_registration_form_notice', 'Die AG-Anmeldung gilt nur für ein Schulhalbjahr.');
+    add_option('flz_ags_registration_form_notice', '');
     flz_ags_create_leader_role();
     if ((bool) get_option('flz_ags_registration_retention_enabled', 0)) {
         flz_ags_schedule_registration_cleanup();

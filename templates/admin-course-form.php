@@ -107,8 +107,8 @@ $admin_textarea_row = static function (string $label, string $name, string $valu
     echo '</td></tr>';
 };
 
-$admin_checkbox = static function (string $name, string $label, bool $checked): void {
-    echo flz_ui()->field(array('type' => 'checkbox', 'name' => $name, 'label' => $label, 'checked' => $checked, 'class' => 'flz-ags-admin-checkbox')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
+$admin_checkbox = static function (string $name, string $label, bool $checked, string $description = ""): void {
+    echo flz_ui()->field(array("type" => "checkbox", "name" => $name, "label" => $label, "checked" => $checked, "description" => $description, "class" => "flz-ags-admin-checkbox")); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
 };
 
 $weekdays = flz_ags_weekdays();
@@ -158,9 +158,9 @@ if (empty($slot_rows)) {
 				<td>
 					<?php
 					$admin_checkbox('only_grade_7', 'nur Klasse 7', !empty($course->only_grade_7));
-					$admin_checkbox('is_active', 'aktiv', $course ? !empty($course->is_active) : true);
-					$admin_checkbox('is_visible', 'im Frontend sichtbar', $course ? !empty($course->is_visible) : true);
-					$admin_checkbox('registration_open', 'Anmeldung geöffnet', $course ? !empty($course->registration_open) : true);
+					$admin_checkbox("is_active", "aktiv", $course ? !empty($course->is_active) : true, "Deaktivierte AGs werden weder öffentlich angezeigt noch können sie über die Homepage angemeldet werden.");
+					$admin_checkbox("is_visible", "im Frontend sichtbar", $course ? !empty($course->is_visible) : true, "Aktive, aber nicht sichtbare AGs werden weder öffentlich angezeigt noch können sie über die Homepage angemeldet werden.");
+					$admin_checkbox("registration_open", "Anmeldung geöffnet", $course ? !empty($course->registration_open) : true, "Die AG bleibt sichtbar, aber die Online-Anmeldung ist geschlossen. Interessierte Schüler*innen können sich direkt an die AG-Leitung wenden.");
 					?>
 				</td>
 			</tr>

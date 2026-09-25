@@ -120,11 +120,17 @@ function flz_ags_multiple_registrations_enabled(): bool
     return (bool) get_option('flz_ags_multiple_registrations_enabled', 0);
 }
 
+/** Verbindlicher, hervorgehobener Hinweis in jedem öffentlichen Anmeldeformular. */
+function flz_ags_required_registration_notice(): string
+{
+    return 'Die Anmeldung für diese AG gilt nur für ein Schulhalbjahr. Wenn ihr im darauffolgenden Halbjahr wieder eine AG besuchen wollt, dann müsst ihr euch am Anfang des Halbjahres neu anmelden. Das gilt auch, wenn ihr in dieser AG bleiben wollt. Die nächste Anmeldemöglichkeit ist ab dem 31.01.2027 möglich.';
+}
+
 function flz_ags_registration_form_notice(): string
 {
     return (string) get_option(
         'flz_ags_registration_form_notice',
-        'Die AG-Anmeldung gilt nur für ein Schulhalbjahr.'
+        ''
     );
 }
 

@@ -788,7 +788,7 @@ class FLZ_AGS_Plugin
         $multiple_registrations_enabled = isset($_POST['multiple_registrations_enabled']) ? 1 : 0;
         $registration_form_notice = isset($_POST['registration_form_notice'])
             ? wp_kses_post(wp_unslash($_POST['registration_form_notice']))
-            : 'Die AG-Anmeldung gilt nur für ein Schulhalbjahr.';
+            : '';
 
         try {
             if ($parent_page_id > 0) {
@@ -1100,8 +1100,7 @@ class FLZ_AGS_Plugin
             . ', '
             . flz_ags_format_time($slot->start_time)
             . '–'
-            . flz_ags_format_time($slot->end_time)
-            . (!empty($slot->room) ? ', Raum ' . $slot->room : '');
+            . flz_ags_format_time($slot->end_time);
 
         $subject = 'AG-Anmeldung bestätigt: ' . (string) $slot->title;
         $message = implode("\n", array_filter(array(
@@ -1117,6 +1116,8 @@ class FLZ_AGS_Plugin
             '',
             is_string($detail_url) && $detail_url !== '' ? 'Detailseite: ' . $detail_url : '',
             '',
+            !empty($slot->room) ? "Ersttreffpunkt: Raum " . (string) $slot->room : "",
+            'Weitere Raumänderungen organisieren die AG-Leitungen direkt mit den Schülerinnen und Schülern.',
             'Die Anmeldung gilt bis auf Widerruf. Änderungen oder Widerrufe bitte über die Schule veranlassen.',
             '',
             'Viele Grüße',

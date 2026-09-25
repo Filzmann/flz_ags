@@ -89,8 +89,7 @@ function flz_ags_course_card_args(object $course): array
             . ', '
             . flz_ags_format_time($slot->start_time)
             . '–'
-            . flz_ags_format_time($slot->end_time)
-            . (!empty($slot->room) ? ' · ' . $slot->room : '');
+            . flz_ags_format_time($slot->end_time);
 
         if ($max > 0) {
             $total_max += $max;
