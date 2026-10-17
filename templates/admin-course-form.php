@@ -10,9 +10,9 @@ foreach (get_users(array('role' => flz_ags_leader_role_slug(), 'orderby' => 'dis
     }
 }
 
-$admin_text_row = static function (string $label, string $name, string $value, string $description = '') use ($ui): void {
+$admin_text_row = static function (string $label, string $name, string $value, string $description = '', string $type = 'text') use ($ui): void {
     echo '<tr><th scope="row"><label for="' . esc_attr($name) . '">' . esc_html($label) . '</label></th><td>';
-    echo $ui->input('text', array('name' => $name, 'id' => $name, 'value' => $value, 'description' => $description, 'input_class' => 'regular-text', 'attrs' => array('aria-label' => $label))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
+    echo $ui->input($type, array('name' => $name, 'id' => $name, 'value' => $value, 'description' => $description, 'input_class' => 'regular-text', 'attrs' => array('aria-label' => $label))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente.
     echo '</td></tr>';
 };
 
@@ -164,7 +164,7 @@ if (empty($slot_rows)) {
 					?>
 				</td>
 			</tr>
-			<?php $admin_text_row('Sortierung', 'sort_order', isset($course->sort_order) ? (string) $course->sort_order : '0', 'kleinere Zahl = weiter oben'); ?>
+			<?php $admin_text_row('Sortierung', 'sort_order', isset($course->sort_order) ? (string) $course->sort_order : '0', 'kleinere Zahl = weiter oben', 'number'); ?>
 		</tbody>
 	</table>
 
