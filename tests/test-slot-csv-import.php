@@ -42,6 +42,14 @@ class FLZ_AGS_Slot_CSV_Import_Test extends WP_UnitTestCase {
 		$this->assertSame( 1, $result['courses'][ $key ]['course']['is_visible'] );
 		$this->assertSame( 18, $result['courses'][ $key ]['slots'][0]['max_participants'] );
 		$this->assertSame( $course->id, FLZ_AGS_Course::get_by_id( $course->id )->id );
+
+		$plan = $this->build_import_plan( $result['courses'] );
+		$this->assertSame( 1, $plan['courses_updated'] );
+		$this->assertSame( 0, $plan['courses_created'] );
+		$this->assertSame( 1, $plan['slots_created'] );
+		$this->assertSame( 0, $plan['slots_updated'] );
+		$this->assertSame( $course->id, $plan['items'][0]['existing']->id );
+		$this->assertSame( 0, $plan['items'][0]['data']['detail_page_id'] );
 	}
 
 	public function test_unknown_course_is_denied_without_creating_courses_or_slots(): void {
@@ -91,5 +99,13 @@ class FLZ_AGS_Slot_CSV_Import_Test extends WP_UnitTestCase {
 		$method->setAccessible( true );
 
 		return $method->invoke( FLZ_AGS_Plugin::instance(), $items );
+	}
+
+	/** @param array<string,array{course:array<string,mixed>,slots:array<int,array<string,mixed>>}> $courses */
+	private function build_import_plan( array $courses ): array {
+		$method = new ReflectionMethod( FLZ_AGS_Plugin::class, 'build_course_csv_import_plan' );
+		$method->setAccessible( true );
+
+		return $method->invoke( FLZ_AGS_Plugin::instance(), $courses );
 	}
 }
