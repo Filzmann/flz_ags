@@ -88,6 +88,11 @@ $rows = FLZ_AGS_Course_CSV::export_rows(
 	static fn( int $course_id ): array => 17 === $course_id ? array( $slot ) : array(),
 	static fn( int $page_id ): string => 23 === $page_id ? 'ags/schach-ag' : ''
 );
+$header = FLZ_AGS_Course_CSV::header();
+flz_ags_csv_assert( ! in_array( 'format_version', $header, true ), 'Der AG-Export enthält weiterhin eine unklare Format-Version.' );
+flz_ags_csv_assert( ! in_array( 'record_type', $header, true ), 'Der AG-Export enthält weiterhin einen technischen Datensatztyp.' );
+flz_ags_csv_assert( ! in_array( 'course_key', $header, true ), 'Der AG-Export enthält weiterhin einen technischen AG-Schlüssel.' );
+flz_ags_csv_assert( in_array( 'AG', $header, true ), 'Der AG-Export enthält keine verständliche AG-Spalte.' );
 $parsed = FLZ_AGS_Course_CSV::parse( array_merge( array( FLZ_AGS_Course_CSV::header() ), $rows ) );
 
 flz_ags_csv_assert( count( $rows ) === 2, 'Der Export enthält nicht genau einen AG- und einen Slot-Datensatz.' );
@@ -133,12 +138,12 @@ flz_ags_csv_assert( $collision_result['courses']['2027/2028|schach-ag']['course'
 flz_ags_csv_assert( $collision_result['courses']['2027/2028|schach-ag']['course']['title'] === 'Schach AG', 'Bei einer Schuljahrkollision gewinnt nicht das neueste Quellschuljahr.' );
 
 $invalid_version = array_merge( array( FLZ_AGS_Course_CSV::header() ), $rows );
-$invalid_version[1][0] = 'flz_ags_courses_v999';
+$invalid_version[1][0] = '2027/2029';
 try {
 	FLZ_AGS_Course_CSV::parse( $invalid_version );
-	throw new RuntimeException( 'Eine unbekannte CSV-Version wurde akzeptiert.' );
+	throw new RuntimeException( 'Ein ungültiger Zeitraum wurde akzeptiert.' );
 } catch ( UnexpectedValueException $error ) {
-	flz_ags_csv_assert( str_contains( $error->getMessage(), 'Version' ), 'Die falsche Version liefert keinen verständlichen Fehler.' );
+	flz_ags_csv_assert( str_contains( $error->getMessage(), 'Schuljahr' ), 'Ein ungültiger Zeitraum liefert keinen verständlichen Fehler.' );
 }
 
 $orphan_slot = array( FLZ_AGS_Course_CSV::header(), $rows[1] );
@@ -158,10 +163,9 @@ try {
 }
 
 $repairable_course = $rows[0];
-$repairable_course[4] = '';
-$repairable_course[8] = 'keine-url';
+$repairable_course[4] = 'keine-url';
 $broken_slot = $rows[1];
-$broken_slot[19] = '99:00';
+$broken_slot[15] = '99:00';
 $tolerant = FLZ_AGS_Course_CSV::parse_tolerant(array(
 	FLZ_AGS_Course_CSV::header(),
 	$repairable_course,
@@ -170,21 +174,18 @@ $tolerant = FLZ_AGS_Course_CSV::parse_tolerant(array(
 	$rows[1],
 ));
 flz_ags_csv_assert( isset( $tolerant['courses']['2026/2027|schach-ag'] ), 'Der fehlertolerante Import verwirft eine reparierbare AG.' );
-flz_ags_csv_assert( str_contains( $tolerant['courses']['2026/2027|schach-ag']['course']['title'], 'Ohne Titel' ), 'Ein fehlender Titel erhält keinen verständlichen Platzhalter.' );
 flz_ags_csv_assert( $tolerant['courses']['2026/2027|schach-ag']['course']['image_url'] === '', 'Eine ungültige optionale Bild-URL wird nicht sicher geleert.' );
 flz_ags_csv_assert( count( $tolerant['courses']['2026/2027|schach-ag']['slots'] ) === 1, 'Fehlerhafte oder doppelte Slots werden nicht einzeln übersprungen.' );
-flz_ags_csv_assert( count( $tolerant['warnings'] ) >= 4, 'Der fehlertolerante Import meldet Korrekturen und ausgelassene Zeilen nicht vollständig.' );
+flz_ags_csv_assert( count( $tolerant['warnings'] ) >= 3, 'Der fehlertolerante Import meldet Korrekturen und ausgelassene Zeilen nicht vollständig.' );
 flz_ags_csv_assert( str_contains( implode( "\n", $tolerant['warnings'] ), 'Zeile 2' ), 'Importhinweise enthalten keine nachvollziehbaren Zeilennummern.' );
 
 $missing_identity = $rows[0];
-$missing_identity[2] = '';
-$missing_identity[4] = 'Robotik AG';
-$missing_identity[5] = '';
-$missing_identity[12] = '7,unbekannt';
+$missing_identity[1] = 'Robotik AG';
+$missing_identity[8] = '7,unbekannt';
 $reconstructed = FLZ_AGS_Course_CSV::parse_tolerant(array(FLZ_AGS_Course_CSV::header(), $missing_identity));
 flz_ags_csv_assert( isset( $reconstructed['courses']['2026/2027|robotik-ag'] ), 'Ein fehlender technischer AG-Schlüssel wird nicht aus Schuljahr und Titel rekonstruiert.' );
 flz_ags_csv_assert( $reconstructed['courses']['2026/2027|robotik-ag']['course']['allowed_grades'] === '7', 'Ungültige Zielgruppenanteile werden nicht einzeln bereinigt.' );
-flz_ags_csv_assert( count( $reconstructed['warnings'] ) >= 3, 'Rekonstruierte Identität und bereinigte Zielgruppe werden nicht vollständig gemeldet.' );
+flz_ags_csv_assert( count( $reconstructed['warnings'] ) >= 1, 'Die bereinigte Zielgruppe wird nicht vollständig gemeldet.' );
 
 $plugin_source = file_get_contents( dirname( __DIR__ ) . '/includes/class-flz-ags.php' );
 $template_source = file_get_contents( dirname( __DIR__ ) . '/templates/admin-course-list.php' );

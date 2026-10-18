@@ -83,8 +83,8 @@ class FLZ_AGS_Plugin
             ),
             'fields' => array(
                 'school_year' => array(
-                    'label' => 'Schuljahr',
-                    'description' => 'Vorhandenes AG-Schuljahr auswählen.',
+                    'label' => 'Zeitraum',
+                    'description' => 'Vorhandenen AG-Zeitraum auswählen.',
                     'control' => 'select',
                     'options' => $school_year_selection['options'],
                 ),
@@ -110,8 +110,8 @@ class FLZ_AGS_Plugin
             ),
             'fields' => array(
                 'school_year' => array(
-                    'label' => 'Schuljahr',
-                    'description' => 'Vorhandenes AG-Schuljahr auswählen.',
+                    'label' => 'Zeitraum',
+                    'description' => 'Vorhandenen AG-Zeitraum auswählen.',
                     'control' => 'select',
                     'options' => $school_year_selection['options'],
                 ),
@@ -164,6 +164,11 @@ class FLZ_AGS_Plugin
             return;
         }
 
+        if (current_user_can(flz_ags_view_all_registrations_capability())) {
+            add_menu_page('AG-Anmeldungen', 'AG-Anmeldungen', flz_ags_view_all_registrations_capability(), 'flz-ags-registrations', array($this, 'render_admin_registrations_page'), 'dashicons-groups', 26);
+            return;
+        }
+
         add_menu_page('Meine AG-Anmeldungen', 'Meine AGs', flz_ags_view_assigned_courses_capability(), 'flz-ags-registrations', array($this, 'render_admin_registrations_page'), 'dashicons-groups', 26);
     }
 
@@ -186,9 +191,14 @@ class FLZ_AGS_Plugin
         return current_user_can(flz_ags_manage_capability());
     }
 
+    private function can_view_all_registrations(): bool
+    {
+        return $this->is_manager() || current_user_can(flz_ags_view_all_registrations_capability());
+    }
+
     private function assert_registration_read_permission(): void
     {
-        if (!$this->is_manager() && !current_user_can(flz_ags_view_assigned_courses_capability())) {
+        if (!$this->can_view_all_registrations() && !current_user_can(flz_ags_view_assigned_courses_capability())) {
             wp_die(esc_html__('Keine Berechtigung.', 'flz-ags'));
         }
     }
@@ -777,7 +787,11 @@ class FLZ_AGS_Plugin
         $this->assert_admin_permission();
         check_admin_referer('flz_ags_save_settings');
 
+        $period_mode = isset($_POST['period_mode']) && 'semester' === sanitize_key(wp_unslash($_POST['period_mode'])) ? 'semester' : 'school_year';
         $school_year = isset($_POST['current_school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_POST['current_school_year']))) : flz_ags_default_school_year();
+        if ('semester' === $period_mode && preg_match('/-([12])$/', $school_year) !== 1) {
+            $school_year = flz_ags_default_period_for_date(current_datetime(), $period_mode);
+        }
         $classes_text = isset($_POST['classes_text']) ? sanitize_textarea_field(wp_unslash($_POST['classes_text'])) : '';
         $classes = isset($_POST['reset_classes']) ? flz_ags_default_classes() : flz_ags_sanitize_classes_from_text($classes_text);
         $parent_page_id = isset($_POST['parent_page_id']) ? absint(wp_unslash($_POST['parent_page_id'])) : 0;
@@ -786,6 +800,13 @@ class FLZ_AGS_Plugin
             ? max(1, min(120, absint(wp_unslash($_POST['registration_retention_months']))))
             : 24;
         $multiple_registrations_enabled = isset($_POST['multiple_registrations_enabled']) ? 1 : 0;
+        $grade_7_exclusive_start = isset($_POST['registration_grade_7_exclusive_start'])
+            ? sanitize_text_field(wp_unslash($_POST['registration_grade_7_exclusive_start']))
+            : '';
+        $grade_7_exclusive_start = preg_match('/^\d{4}-\d{2}-\d{2}$/', $grade_7_exclusive_start) === 1 ? $grade_7_exclusive_start : '';
+        $grade_7_exclusive_days = isset($_POST['registration_grade_7_exclusive_days'])
+            ? max(1, min(31, absint(wp_unslash($_POST['registration_grade_7_exclusive_days']))))
+            : 7;
         $registration_form_notice = isset($_POST['registration_form_notice'])
             ? wp_kses_post(wp_unslash($_POST['registration_form_notice']))
             : '';
@@ -802,6 +823,9 @@ class FLZ_AGS_Plugin
             update_option('flz_ags_registration_retention_months', $retention_months, false);
             update_option('flz_ags_registration_retention_enabled', $retention_enabled, false);
             update_option('flz_ags_multiple_registrations_enabled', $multiple_registrations_enabled, false);
+            update_option('flz_ags_period_mode', $period_mode, false);
+            update_option('flz_ags_registration_grade_7_exclusive_start', $grade_7_exclusive_start, false);
+            update_option('flz_ags_registration_grade_7_exclusive_days', $grade_7_exclusive_days, false);
             update_option('flz_ags_registration_form_notice', $registration_form_notice, false);
         } catch (Throwable $error) {
             $this->redirect_admin_error(
@@ -1338,6 +1362,16 @@ class FLZ_AGS_Plugin
                     if (flz_ags_multiple_registrations_enabled()) {
                         $duplicate_criteria['course_id'] = (int) $slot->course_id;
                     }
+                    if (
+                        '7' === flz_ags_extract_grade_key($class_name)
+                        && flz_ags_grade_7_exclusive_window_active()
+                        && FLZ_AGS_Registration::find_active_for_student($school_year, $class_name, $first_name, $last_name) instanceof FLZ_AGS_Registration
+                    ) {
+                        return array(
+                            'success' => false,
+                            'messages' => array('Für Klasse 7 ist während des konfigurierten Anmeldezeitraums nur eine aktive AG-Anmeldung möglich.'),
+                        );
+                    }
                     $duplicate = FLZ_AGS_Registration::count_by($duplicate_criteria);
                     if ($duplicate > 0) {
                         return array(
@@ -1417,9 +1451,11 @@ class FLZ_AGS_Plugin
         $courses = array();
         $load_failed = false;
         try {
-            if ($this->is_manager()) {
+            if ($this->can_view_all_registrations()) {
                 $registrations = FLZ_AGS_Registration::find_for_admin($school_year, 'all');
-                $slots = $this->get_public_slots($school_year);
+                if ($this->is_manager()) {
+                    $slots = $this->get_public_slots($school_year);
+                }
             } else {
                 $registrations = FLZ_AGS_Registration::find_for_leader($school_year, get_current_user_id());
                 $courses = FLZ_AGS_Course::find_for_leader($school_year, get_current_user_id());
@@ -1430,7 +1466,7 @@ class FLZ_AGS_Plugin
         }
 
         echo '<div class="wrap flz-ags-admin">';
-        echo '<h1>' . esc_html($this->is_manager() ? 'AG-Anmeldungen' : 'Meine AG-Anmeldungen') . '</h1>';
+        echo '<h1>' . esc_html($this->can_view_all_registrations() ? 'AG-Anmeldungen' : 'Meine AG-Anmeldungen') . '</h1>';
         if (isset($_GET['updated'])) {
             echo wp_kses_post(flz_ags_notice('Anmeldung aktualisiert.'));
         }
@@ -1450,7 +1486,7 @@ class FLZ_AGS_Plugin
             );
         }
 
-        flz_ags_render_backend_template($this->is_manager() ? 'registrations' : 'leader-registrations', array(
+        flz_ags_render_backend_template($this->is_manager() ? 'registrations' : ($this->can_view_all_registrations() ? 'all-registrations-readonly' : 'leader-registrations'), array(
             'school_year' => $school_year,
             'registrations' => $registrations,
             'slots' => $slots,

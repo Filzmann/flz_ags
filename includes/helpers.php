@@ -110,9 +110,19 @@ function flz_ags_view_assigned_courses_capability(): string
     return 'flz_ags_view_assigned_courses';
 }
 
+function flz_ags_view_all_registrations_capability(): string
+{
+    return 'flz_ags_view_all_registrations';
+}
+
 function flz_ags_leader_role_slug(): string
 {
     return 'flz_ags_leader';
+}
+
+function flz_ags_administration_role_slug(): string
+{
+    return 'flz_ags_administration';
 }
 
 function flz_ags_multiple_registrations_enabled(): bool
@@ -157,6 +167,38 @@ function flz_ags_default_school_year(): string
     return flz_ags_default_school_year_for_date(current_datetime());
 }
 
+/** Der Modus beeinflusst ausschließlich neue Perioden; historische Jahreswerte bleiben gültig. */
+function flz_ags_period_mode(): string
+{
+    return 'semester' === get_option('flz_ags_period_mode', 'school_year') ? 'semester' : 'school_year';
+}
+
+function flz_ags_default_period_for_date(DateTimeInterface $date, ?string $mode = null): string
+{
+    $school_year = flz_ags_default_school_year_for_date($date);
+    if ('semester' !== ($mode ?? flz_ags_period_mode())) {
+        return $school_year;
+    }
+
+    return $school_year . ((int) $date->format('n') >= 2 && (int) $date->format('n') <= 7 ? '-2' : '-1');
+}
+
+function flz_ags_current_period(): string
+{
+    $value = (string) get_option('flz_ags_current_school_year', '');
+    return '' !== $value ? flz_ags_sanitize_period($value) : flz_ags_default_period_for_date(current_datetime());
+}
+
+function flz_ags_sanitize_period($value): string
+{
+    $value = preg_replace('/\s+/', '', sanitize_text_field((string) $value));
+    if (preg_match('/^(\d{4})\/(\d{4})(?:-([12]))?$/', $value, $matches) && (int) $matches[2] === (int) $matches[1] + 1) {
+        return $value;
+    }
+
+    return flz_ags_default_period_for_date(current_datetime());
+}
+
 /**
  * Bestimmt das Schuljahr am Berliner Sommerferienbeginn.
  *
@@ -195,7 +237,7 @@ function flz_ags_default_school_year_for_date(DateTimeInterface $date): string
  */
 function flz_ags_block_school_year_selection(): array
 {
-    $default = flz_ags_default_school_year();
+    $default = flz_ags_current_period();
     $school_years = array($default);
 
     if (class_exists('FLZ_AGS_Course')) {
@@ -209,7 +251,7 @@ function flz_ags_block_school_year_selection(): array
     $school_years = array_values(array_unique(array_filter(
         array_map('strval', $school_years),
         static function (string $school_year): bool {
-            return preg_match('/^\d{4}\/\d{4}$/', $school_year) === 1;
+            return preg_match('/^\d{4}\/\d{4}(?:-[12])?$/', $school_year) === 1;
         }
     )));
     rsort($school_years, SORT_STRING);
@@ -227,18 +269,35 @@ function flz_ags_block_school_year_selection(): array
 
 function flz_ags_current_school_year(): string
 {
-    $value = (string) get_option('flz_ags_current_school_year', '');
-    return $value !== '' ? $value : flz_ags_default_school_year();
+    return flz_ags_current_period();
 }
 
 function flz_ags_sanitize_school_year($value): string
 {
-    $value = sanitize_text_field((string) $value);
-    if (preg_match('/^\d{4}\s*\/\s*\d{4}$/', $value)) {
-        return preg_replace('/\s+/', '', $value);
-    }
+    return flz_ags_sanitize_period($value);
+}
 
-    return flz_ags_default_school_year();
+function flz_ags_registration_grade_7_exclusive_start(): string
+{
+    $value = (string) get_option('flz_ags_registration_grade_7_exclusive_start', '');
+    return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? $value : '';
+}
+
+function flz_ags_registration_grade_7_exclusive_days(): int
+{
+    return max(1, min(31, (int) get_option('flz_ags_registration_grade_7_exclusive_days', 7)));
+}
+
+function flz_ags_grade_7_exclusive_window_active(?DateTimeInterface $now = null): bool
+{
+    $start_value = flz_ags_registration_grade_7_exclusive_start();
+    if ('' === $start_value) {
+        return false;
+    }
+    $now = $now ?? current_datetime();
+    $start = new DateTimeImmutable($start_value . ' 00:00:00', $now->getTimezone());
+    $end = $start->modify('+' . flz_ags_registration_grade_7_exclusive_days() . ' days');
+    return $now >= $start && $now < $end;
 }
 
 function flz_ags_default_classes(): array

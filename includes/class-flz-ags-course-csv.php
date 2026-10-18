@@ -12,37 +12,19 @@ final class FLZ_AGS_Course_CSV
 {
     public const VERSION = 'flz_ags_courses_v1';
 
+    /** @return array<int,string> */
+    private static function legacy_header(): array
+    {
+        return array('format_version', 'record_type', 'course_key', 'school_year', 'title', 'slug', 'short_description', 'description', 'image_url', 'detail_page_path', 'category', 'leader_name', 'allowed_grades', 'only_grade_7', 'is_active', 'is_visible', 'registration_open', 'course_sort_order', 'slot_weekday', 'slot_start_time', 'slot_end_time', 'slot_room', 'slot_max_participants', 'slot_is_active', 'slot_sort_order');
+    }
+
     /**
      * @return array<int,string>
      */
     public static function header(): array
     {
         return array(
-            'format_version',
-            'record_type',
-            'course_key',
-            'school_year',
-            'title',
-            'slug',
-            'short_description',
-            'description',
-            'image_url',
-            'detail_page_path',
-            'category',
-            'leader_name',
-            'allowed_grades',
-            'only_grade_7',
-            'is_active',
-            'is_visible',
-            'registration_open',
-            'course_sort_order',
-            'slot_weekday',
-            'slot_start_time',
-            'slot_end_time',
-            'slot_room',
-            'slot_max_participants',
-            'slot_is_active',
-            'slot_sort_order',
+            'Zeitraum', 'AG', 'Kurzbeschreibung', 'Beschreibung', 'Bild-URL', 'Detailseite', 'Kategorie', 'AG-Leitung', 'Jahrgänge', 'Nur Klasse 7', 'Aktiv', 'Sichtbar', 'Anmeldung offen', 'Sortierung', 'Wochentag', 'Beginn', 'Ende', 'Raum', 'Maximale Teilnehmende', 'Termin aktiv', 'Termin-Sortierung',
         );
     }
 
@@ -66,14 +48,9 @@ final class FLZ_AGS_Course_CSV
 
             $school_year = (string) ($course->school_year ?? '');
             $slug = (string) ($course->slug ?? '');
-            $key = self::course_key($school_year, $slug);
             $rows[] = array(
-                self::VERSION,
-                'course',
-                $key,
                 $school_year,
                 (string) ($course->title ?? ''),
-                $slug,
                 (string) ($course->short_description ?? ''),
                 (string) ($course->description ?? ''),
                 (string) ($course->image_url ?? ''),
@@ -87,8 +64,7 @@ final class FLZ_AGS_Course_CSV
                 (int) ($course->is_active ?? 0),
                 (int) ($course->is_visible ?? 0),
                 (int) ($course->registration_open ?? 0),
-                (int) ($course->sort_order ?? 0),
-                '', '', '', '', '', '', '',
+                (int) ($course->sort_order ?? 0), '', '', '', '', '', '', '',
             );
 
             $slots = $slots_for_course((int) $course->id);
@@ -101,12 +77,8 @@ final class FLZ_AGS_Course_CSV
                     throw new UnexpectedValueException('Ein AG-Termin besitzt kein gültiges Datenformat.');
                 }
                 $rows[] = array(
-                    self::VERSION,
-                    'slot',
-                    $key,
                     $school_year,
-                    '',
-                    $slug,
+                    (string) ($course->title ?? ''),
                     '', '', '', '', '', '', '', '', '', '', '', '',
                     (int) ($slot->weekday ?? 0),
                     (string) ($slot->start_time ?? ''),
@@ -132,12 +104,13 @@ final class FLZ_AGS_Course_CSV
      */
     public static function parse_tolerant(array $raw_rows): array
     {
+        $raw_rows = self::normalize_input($raw_rows);
         if (empty($raw_rows)) {
             throw new UnexpectedValueException('Die AG-CSV ist leer.');
         }
 
         $header = array_map(array(self::class, 'decode_cell'), array_shift($raw_rows));
-        if ($header !== self::header()) {
+        if ($header !== self::legacy_header()) {
             throw new UnexpectedValueException('Die Kopfzeile entspricht nicht dem erwarteten AG-CSV-Format. Bitte eine zuvor heruntergeladene AG-CSV als Vorlage verwenden.');
         }
 
@@ -145,7 +118,7 @@ final class FLZ_AGS_Course_CSV
         $course_rows = array();
         $courses = array();
         $pending_slots = array();
-        $column_count = count(self::header());
+        $column_count = count(self::legacy_header());
 
         foreach ($raw_rows as $index => $raw_row) {
             $line_number = $index + 2;
@@ -173,7 +146,7 @@ final class FLZ_AGS_Course_CSV
             if ('course' === $row[1]) {
                 $row = self::repair_course_row($row, $line_number, $warnings);
                 try {
-                    $parsed = self::parse(array(self::header(), $row));
+                    $parsed = self::parse(array(self::legacy_header(), $row));
                     $key = (string) array_key_first($parsed);
                     if (isset($courses[$key])) {
                         $warnings[] = 'Zeile ' . $line_number . ' wurde übersprungen: Die AG „' . $key . '“ kam bereits vorher in der Datei vor.';
@@ -206,7 +179,7 @@ final class FLZ_AGS_Course_CSV
             }
 
             try {
-                $parsed = self::parse(array(self::header(), $course_rows[$key], $row));
+                $parsed = self::parse(array(self::legacy_header(), $course_rows[$key], $row));
                 $slot = $parsed[$key]['slots'][0];
                 $slot_key = implode('|', array($slot['weekday'], $slot['start_time'], $slot['end_time'], strtolower((string) $slot['room'])));
                 if (isset($slot_keys[$key][$slot_key])) {
@@ -235,7 +208,7 @@ final class FLZ_AGS_Course_CSV
     public static function remap_school_year(array $parsed, string $target_school_year): array
     {
         if (
-            preg_match('/^(\d{4})\/(\d{4})$/', $target_school_year, $matches) !== 1
+            preg_match('/^(\d{4})\/(\d{4})(?:-([12]))?$/', $target_school_year, $matches) !== 1
             || (int) $matches[2] !== (int) $matches[1] + 1
         ) {
             throw new UnexpectedValueException('Das ausgewählte Zielschuljahr ist ungültig. Erwartet wird beispielsweise 2027/2028.');
@@ -271,12 +244,13 @@ final class FLZ_AGS_Course_CSV
      */
     public static function parse(array $raw_rows): array
     {
+        $raw_rows = self::normalize_input($raw_rows);
         if (empty($raw_rows)) {
             throw new UnexpectedValueException('Die AG-CSV ist leer.');
         }
 
         $header = array_map(array(self::class, 'decode_cell'), array_shift($raw_rows));
-        if ($header !== self::header()) {
+        if ($header !== self::legacy_header()) {
             throw new UnexpectedValueException('Die Kopfzeile entspricht nicht dem erwarteten AG-CSV-Format.');
         }
 
@@ -291,7 +265,7 @@ final class FLZ_AGS_Course_CSV
             if (count(array_filter($row, static fn(string $value): bool => '' !== $value)) === 0) {
                 continue;
             }
-            if (count($row) !== count(self::header())) {
+            if (count($row) !== count(self::legacy_header())) {
                 throw new UnexpectedValueException('CSV-Zeile ' . $line_number . ' besitzt nicht die erwartete Spaltenzahl.');
             }
             if ($row[0] !== self::VERSION) {
@@ -387,6 +361,33 @@ final class FLZ_AGS_Course_CSV
         return $courses;
     }
 
+    /** @param array<int,array<int,string|null>> $raw_rows @return array<int,array<int,string|null>> */
+    private static function normalize_input(array $raw_rows): array
+    {
+        if (empty($raw_rows)) {
+            return $raw_rows;
+        }
+        $header = array_map(array(self::class, 'decode_cell'), (array) $raw_rows[0]);
+        if ($header !== self::header()) {
+            return $raw_rows;
+        }
+
+        $normalized = array(self::legacy_header());
+        foreach (array_slice($raw_rows, 1) as $raw_row) {
+            $row = array_pad(array_map(array(self::class, 'decode_cell'), is_array($raw_row) ? $raw_row : array()), 21, '');
+            $slug = sanitize_title($row[1]);
+            $record_type = '' === $row[14] ? 'course' : 'slot';
+            $key = self::course_key($row[0], $slug);
+            $normalized[] = array(
+                self::VERSION, $record_type, $key, $row[0], $row[1], $slug,
+                $row[2], $row[3], $row[4], $row[5], $row[6], $row[7], $row[8], $row[9],
+                $row[10], $row[11], $row[12], $row[13], $row[14], $row[15], $row[16], $row[17],
+                $row[18], $row[19], $row[20],
+            );
+        }
+        return $normalized;
+    }
+
     private static function decode_cell($value): string
     {
         $value = (string) ($value ?? '');
@@ -454,7 +455,7 @@ final class FLZ_AGS_Course_CSV
         foreach (array(13 => '0', 14 => '1', 15 => '1', 16 => '0') as $column => $default) {
             if ('0' !== $row[$column] && '1' !== $row[$column]) {
                 $row[$column] = $default;
-                $warnings[] = 'Zeile ' . $line_number . ': Ungültiger Ja/Nein-Wert in Spalte „' . self::header()[$column] . '“ wurde durch ' . $default . ' ersetzt.';
+                $warnings[] = 'Zeile ' . $line_number . ': Ungültiger Ja/Nein-Wert in Spalte „' . self::legacy_header()[$column] . '“ wurde durch ' . $default . ' ersetzt.';
             }
         }
         if (!preg_match('/^-?\d+$/', $row[17])) {
@@ -512,7 +513,7 @@ final class FLZ_AGS_Course_CSV
 
     private static function school_year(string $value, int $line_number): string
     {
-        if (!preg_match('/^(\d{4})\/(\d{4})$/', $value, $matches) || (int) $matches[2] !== (int) $matches[1] + 1) {
+        if (!preg_match('/^(\d{4})\/(\d{4})(?:-([12]))?$/', $value, $matches) || (int) $matches[2] !== (int) $matches[1] + 1) {
             throw new UnexpectedValueException('CSV-Zeile ' . $line_number . ' enthält kein gültiges Schuljahr.');
         }
         return $value;

@@ -44,7 +44,7 @@ $page_picker_row = static function (
 };
 ?>
 
-<p class="description">Hier werden die Grunddaten gepflegt, die Lehrkräfte und Sekretariat im Alltag benötigen: aktuelles Schuljahr, öffentliche AG-Hauptseite und die Klassenliste für das Anmeldeformular.</p>
+<p class="description">Hier werden die Grunddaten gepflegt, die Lehrkräfte und Sekretariat im Alltag benötigen: aktueller Zeitraum, öffentliche AG-Hauptseite und die Klassenliste für das Anmeldeformular.</p>
 
 <?php echo $ui->form_start(array('method' => 'post', 'action' => admin_url('admin-post.php'), 'nonce' => 'flz_ags_save_settings', 'hidden' => array('action' => 'flz_ags_save_settings'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formular. ?>
     <div class="flz-ags-settings-grid">
@@ -53,9 +53,15 @@ $page_picker_row = static function (
             <table class="form-table" role="presentation">
                 <tbody>
                     <tr>
-                        <th scope="row"><label for="flz_ags_current_school_year">Aktuelles Schuljahr</label></th>
+                        <th scope="row"><label for="flz_ags_current_school_year">Aktueller Zeitraum</label></th>
                         <td>
-                            <?php echo $ui->input('text', array('name' => 'current_school_year', 'id' => 'flz_ags_current_school_year', 'value' => flz_ags_current_school_year(), 'description' => 'Format: 2026/2027. AGs und Anmeldungen werden schuljahrbezogen geführt.', 'input_class' => 'regular-text', 'attrs' => array('aria-label' => 'Aktuelles Schuljahr'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+                            <?php echo $ui->input('text', array('name' => 'current_school_year', 'id' => 'flz_ags_current_school_year', 'value' => flz_ags_current_school_year(), 'description' => 'Schuljahr: 2026/2027; Schulhalbjahr: 2026/2027-1 oder 2026/2027-2. Neue Daten verwenden die unten ausgewählte Zeitraumeinstellung.', 'input_class' => 'regular-text', 'attrs' => array('aria-label' => 'Aktueller Zeitraum'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="flz_ags_period_mode">Zeitraum der AGs und Anmeldungen</label></th>
+                        <td>
+                            <?php echo $ui->field(array('type' => 'select', 'name' => 'period_mode', 'id' => 'flz_ags_period_mode', 'value' => flz_ags_period_mode(), 'options' => array('school_year' => 'Schuljahr', 'semester' => 'Schulhalbjahr'), 'description' => 'Neue AGs und Anmeldungen verwenden den gewählten Zeitraum. Bereits gespeicherte Schuljahresdaten bleiben als Historie erhalten.')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
                         </td>
                     </tr>
                     <?php
@@ -96,6 +102,12 @@ $page_picker_row = static function (
                     </tr>
                 </tbody>
             </table>
+            <h3>Anmeldezeitraum für Klasse 7</h3>
+            <p class="description">Im aktiven Zeitraum kann jede Schülerin und jeder Schüler der 7. Klassen nur eine aktive AG auswählen. Danach gelten wieder die Einstellungen zur Mehrfachanmeldung.</p>
+            <table class="form-table" role="presentation"><tbody>
+                <tr><th scope="row"><label for="flz_ags_registration_grade_7_exclusive_start">Startdatum</label></th><td><?php echo $ui->input('date', array('name' => 'registration_grade_7_exclusive_start', 'id' => 'flz_ags_registration_grade_7_exclusive_start', 'value' => flz_ags_registration_grade_7_exclusive_start(), 'description' => 'Leer lassen, um die Sonderregel auszuschalten.')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?></td></tr>
+                <tr><th scope="row"><label for="flz_ags_registration_grade_7_exclusive_days">Dauer</label></th><td><?php echo $ui->input('number', array('name' => 'registration_grade_7_exclusive_days', 'id' => 'flz_ags_registration_grade_7_exclusive_days', 'value' => flz_ags_registration_grade_7_exclusive_days(), 'min' => 1, 'max' => 31, 'description' => 'Tage ab Startdatum; Vorgabe sind sieben Tage.')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?></td></tr>
+            </tbody></table>
         </section>
 
         <section class="flz-ags-settings-card">

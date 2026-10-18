@@ -25,11 +25,15 @@ function flz_ags_activate(): void
 {
     flz_ags_maybe_upgrade();
     flz_ags_create_leader_role();
+    flz_ags_create_administration_role();
     add_option('flz_ags_current_school_year', flz_ags_default_school_year());
     add_option('flz_ags_classes', flz_ags_default_classes());
     add_option('flz_ags_parent_page_id', flz_ags_detect_detail_parent_page_id());
     add_option('flz_ags_registration_retention_enabled', 0);
     add_option('flz_ags_registration_retention_months', 24);
+    add_option('flz_ags_period_mode', 'school_year');
+    add_option('flz_ags_registration_grade_7_exclusive_start', '');
+    add_option('flz_ags_registration_grade_7_exclusive_days', 7);
     if ((bool) get_option('flz_ags_registration_retention_enabled', 0)) {
         flz_ags_schedule_registration_cleanup();
     }
@@ -76,6 +80,10 @@ function flz_ags_maybe_upgrade(): void
     add_option('flz_ags_multiple_registrations_enabled', 0);
     add_option('flz_ags_registration_form_notice', '');
     flz_ags_create_leader_role();
+    flz_ags_create_administration_role();
+    add_option('flz_ags_period_mode', 'school_year');
+    add_option('flz_ags_registration_grade_7_exclusive_start', '');
+    add_option('flz_ags_registration_grade_7_exclusive_days', 7);
     if ((bool) get_option('flz_ags_registration_retention_enabled', 0)) {
         flz_ags_schedule_registration_cleanup();
     }
@@ -100,6 +108,21 @@ function flz_ags_create_leader_role(): void
     }
     $role->add_cap('read');
     $role->add_cap(flz_ags_view_assigned_courses_capability());
+}
+
+function flz_ags_create_administration_role(): void
+{
+    $role = get_role(flz_ags_administration_role_slug());
+    if (!$role instanceof WP_Role) {
+        add_role(
+            flz_ags_administration_role_slug(),
+            'AG-Verwaltung',
+            array('read' => true, flz_ags_view_all_registrations_capability() => true)
+        );
+        return;
+    }
+    $role->add_cap('read');
+    $role->add_cap(flz_ags_view_all_registrations_capability());
 }
 
 function flz_ags_upgrade_leader_assignment_and_multiple_registrations_v21(): void

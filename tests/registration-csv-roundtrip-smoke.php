@@ -44,8 +44,12 @@ $registration = (object) array(
 );
 
 $rows = FLZ_AGS_Registration_CSV::export_rows( array( $registration ) );
+$header = FLZ_AGS_Registration_CSV::header();
+flz_ags_registration_csv_assert( ! in_array( 'format_version', $header, true ), 'Der Export enthält weiterhin eine unklare Format-Version.' );
+flz_ags_registration_csv_assert( ! in_array( 'course_slug', $header, true ), 'Der Export enthält weiterhin einen technischen AG-Slug.' );
+flz_ags_registration_csv_assert( in_array( 'AG', $header, true ), 'Der Export enthält keine verständliche AG-Spalte.' );
 $parsed = FLZ_AGS_Registration_CSV::parse_tolerant(
-	array_merge( array( FLZ_AGS_Registration_CSV::header() ), $rows )
+	array_merge( array( $header ), $rows )
 );
 
 flz_ags_registration_csv_assert( count( $parsed['registrations'] ) === 1, 'Der Anmeldungs-CSV-Roundtrip verliert den Datensatz.' );
@@ -58,12 +62,12 @@ flz_ags_registration_csv_assert( ! in_array( 'course_id', FLZ_AGS_Registration_C
 flz_ags_registration_csv_assert( ! in_array( 'slot_id', FLZ_AGS_Registration_CSV::header(), true ), 'Der Backupvertrag enthält installationsabhängige Slot-IDs.' );
 
 $repairable = $rows[0];
-$repairable[2] = 'unbekannt';
-$repairable[3] = '';
+$repairable[1] = 'unbekannt';
+$repairable[2] = '';
+$repairable[4] = '';
 $repairable[5] = '';
-$repairable[6] = '';
-$repairable[7] = 'keine-mail';
-$repairable[8] = 'vielleicht';
+$repairable[6] = 'keine-mail';
+$repairable[7] = 'vielleicht';
 $repaired = FLZ_AGS_Registration_CSV::parse_tolerant( array( FLZ_AGS_Registration_CSV::header(), $repairable ) );
 flz_ags_registration_csv_assert( count( $repaired['registrations'] ) === 1, 'Ein reparierbarer Anmeldedatensatz wird vollständig verworfen.' );
 flz_ags_registration_csv_assert( $repaired['registrations'][0]['status'] === 'cancelled', 'Ein unbekannter Status erhält keinen sicheren Platzhalter.' );
@@ -74,9 +78,9 @@ flz_ags_registration_csv_assert( count( $repaired['warnings'] ) >= 5, 'Automatis
 flz_ags_registration_csv_assert( str_contains( implode( "\n", $repaired['warnings'] ), 'Zeile 2' ), 'Importhinweise enthalten keine Zeilennummer.' );
 
 $broken = $rows[0];
-$broken[1] = '';
-$broken[9] = '';
-$broken[12] = '99:00';
+$broken[0] = '';
+$broken[8] = '';
+$broken[10] = '99:00';
 $skipped = FLZ_AGS_Registration_CSV::parse_tolerant( array( FLZ_AGS_Registration_CSV::header(), $broken ) );
 flz_ags_registration_csv_assert( count( $skipped['registrations'] ) === 0, 'Ein Datensatz ohne Schuljahr/AG/Slot wird importiert.' );
 flz_ags_registration_csv_assert( str_contains( implode( "\n", $skipped['warnings'] ), 'übersprungen' ), 'Ein ausgelassener Datensatz wird nicht verständlich gemeldet.' );

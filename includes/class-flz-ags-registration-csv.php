@@ -13,28 +13,16 @@ final class FLZ_AGS_Registration_CSV
     public const VERSION = 'flz_ags_registrations_v1';
 
     /** @return array<int,string> */
+    private static function legacy_header(): array
+    {
+        return array('format_version', 'school_year', 'status', 'class_name', 'grade_key', 'student_last_name', 'student_first_name', 'student_email', 'consent_privacy', 'course_slug', 'course_title', 'slot_weekday', 'slot_start_time', 'slot_end_time', 'slot_room', 'withdrawn_at', 'withdrawn_reason', 'created_at', 'updated_at');
+    }
+
+    /** @return array<int,string> */
     public static function header(): array
     {
         return array(
-            'format_version',
-            'school_year',
-            'status',
-            'class_name',
-            'grade_key',
-            'student_last_name',
-            'student_first_name',
-            'student_email',
-            'consent_privacy',
-            'course_slug',
-            'course_title',
-            'slot_weekday',
-            'slot_start_time',
-            'slot_end_time',
-            'slot_room',
-            'withdrawn_at',
-            'withdrawn_reason',
-            'created_at',
-            'updated_at',
+            'Zeitraum', 'Status', 'Klasse', 'Jahrgang', 'Nachname', 'Vorname', 'E-Mail', 'Datenschutz bestätigt', 'AG', 'Wochentag', 'Beginn', 'Ende', 'Raum', 'Abgemeldet am', 'Abmeldegrund', 'Angemeldet am', 'Zuletzt geändert',
         );
     }
 
@@ -50,7 +38,6 @@ final class FLZ_AGS_Registration_CSV
                 throw new UnexpectedValueException('Ein Anmeldungsdatensatz besitzt kein exportierbares Format.');
             }
             $rows[] = array(
-                self::VERSION,
                 (string) ($registration->school_year ?? ''),
                 (string) ($registration->status ?? ''),
                 (string) ($registration->class_name ?? ''),
@@ -59,7 +46,6 @@ final class FLZ_AGS_Registration_CSV
                 (string) ($registration->student_first_name ?? ''),
                 (string) ($registration->student_email ?? ''),
                 (int) ($registration->consent_privacy ?? 0),
-                (string) ($registration->slug ?? ''),
                 (string) ($registration->title ?? ''),
                 (int) ($registration->weekday ?? 0),
                 (string) ($registration->start_time ?? ''),
@@ -87,13 +73,19 @@ final class FLZ_AGS_Registration_CSV
             throw new UnexpectedValueException('Die Anmeldungs-CSV ist leer.');
         }
         $header = array_map(array(self::class, 'decode_cell'), array_shift($raw_rows));
-        if ($header !== self::header()) {
+        if ($header === self::header()) {
+            $raw_rows = array_map(static function ($row): array {
+                $row = array_pad(array_map('strval', is_array($row) ? $row : array()), 17, '');
+                $slug = trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($row[8])), '-');
+                return array(self::VERSION, $row[0], $row[1], $row[2], $row[3], $row[4], $row[5], $row[6], $row[7], $slug, $row[8], $row[9], $row[10], $row[11], $row[12], $row[13], $row[14], $row[15], $row[16]);
+            }, $raw_rows);
+        } elseif ($header !== self::legacy_header()) {
             throw new UnexpectedValueException('Die Kopfzeile entspricht nicht dem erwarteten Anmeldungs-Backup. Bitte eine zuvor heruntergeladene Anmeldungs-CSV verwenden.');
         }
 
         $registrations = array();
         $warnings = array();
-        $column_count = count(self::header());
+        $column_count = count(self::legacy_header());
         foreach ($raw_rows as $index => $raw_row) {
             $line = $index + 2;
             if (!is_array($raw_row)) {
@@ -207,7 +199,7 @@ final class FLZ_AGS_Registration_CSV
 
     private static function valid_school_year(string $value): bool
     {
-        return preg_match('/^(\d{4})\/(\d{4})$/', $value, $matches) === 1
+        return preg_match('/^(\d{4})\/(\d{4})(?:-([12]))?$/', $value, $matches) === 1
             && (int) $matches[2] === (int) $matches[1] + 1;
     }
 
