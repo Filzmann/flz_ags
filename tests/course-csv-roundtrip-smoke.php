@@ -107,6 +107,34 @@ $parsed_slots = FLZ_AGS_Course_CSV::parse_slot_csv(array_merge(array(FLZ_AGS_Cou
 flz_ags_csv_assert(isset($parsed_slots['2026/2027|schach-ag']), 'Die getrennte Termin-CSV lässt sich nicht wieder einlesen.');
 flz_ags_csv_assert(1 === count($parsed_slots['2026/2027|schach-ag']['slots']), 'Der getrennte Termin-CSV-Import verliert Termine.');
 
+$slot_csv_assert_rejected = static function (array $rows, string $expected_message): void {
+	try {
+		FLZ_AGS_Course_CSV::parse_slot_csv($rows);
+		throw new RuntimeException('Eine manipulierte Termin-CSV wurde akzeptiert.');
+	} catch (UnexpectedValueException $error) {
+		flz_ags_csv_assert(str_contains($error->getMessage(), $expected_message), 'Die manipulierte Termin-CSV liefert keinen verständlichen Fehler: ' . $expected_message);
+	}
+};
+$slot_csv_assert_rejected(array(array('falsche', 'Kopfzeile')), 'Kopfzeile');
+$slot_csv_assert_rejected(array(FLZ_AGS_Course_CSV::slot_header()), 'keine Datensätze');
+$slot_csv_assert_rejected(array(FLZ_AGS_Course_CSV::slot_header(), array_slice($slot_rows[0], 0, 8)), 'Spaltenzahl');
+$invalid_slot = $slot_rows[0];
+$invalid_slot[1] = '';
+$slot_csv_assert_rejected(array(FLZ_AGS_Course_CSV::slot_header(), $invalid_slot), 'AG-Titel');
+$invalid_slot = $slot_rows[0];
+$invalid_slot[2] = '8';
+$slot_csv_assert_rejected(array(FLZ_AGS_Course_CSV::slot_header(), $invalid_slot), 'Termin');
+$invalid_slot = $slot_rows[0];
+$invalid_slot[3] = '25:00';
+$slot_csv_assert_rejected(array(FLZ_AGS_Course_CSV::slot_header(), $invalid_slot), 'Zeit');
+$invalid_slot = $slot_rows[0];
+$invalid_slot[6] = '-1';
+$slot_csv_assert_rejected(array(FLZ_AGS_Course_CSV::slot_header(), $invalid_slot), 'negativen Wert');
+$invalid_slot = $slot_rows[0];
+$invalid_slot[7] = 'ja';
+$slot_csv_assert_rejected(array(FLZ_AGS_Course_CSV::slot_header(), $invalid_slot), 'booleschen Wert');
+$slot_csv_assert_rejected(array(FLZ_AGS_Course_CSV::slot_header(), $slot_rows[0], $slot_rows[0]), 'mehrfach');
+
 $course_only_rows = FLZ_AGS_Course_CSV::export_rows(
 	array( $course ),
 	static fn( int $course_id ): array => array(),
