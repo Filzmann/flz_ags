@@ -399,6 +399,11 @@ th[aria-sort="descending"] .flz-ags-admin-sort-button::after {
   margin-top: 0;
 }
 
+.flz-ags-settings-card--organisation,
+.flz-ags-settings-card--classes {
+  grid-column: auto;
+}
+
 .flz-ags-settings-card .form-table {
   margin-top: 0;
 }
@@ -412,6 +417,28 @@ th[aria-sort="descending"] .flz-ags-admin-sort-button::after {
   padding: 0.65rem 0.75rem;
   border-left: 4px solid #2271b1;
   background: #f6f7f7;
+}
+
+.flz-ags-settings-help {
+  grid-column: auto;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #dcdcde;
+  border-radius: 0.45rem;
+  background: #fff;
+}
+
+.flz-ags-settings-help summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.flz-ags-settings-section-row h3 {
+  margin: 0;
+}
+
+.flz-ags-settings-section-row .description {
+  margin: 0.25rem 0 0;
+  font-weight: 400;
 }
 
 .flz-ags-settings-help ul {
@@ -575,6 +602,18 @@ th[aria-sort="descending"] .flz-ags-admin-sort-button::after {
 @media (prefers-reduced-motion: reduce) {
   .flz-ags-registration-panel .flz-ui-floating-panel__trigger::after {
     animation: none;
+  }
+}
+
+@media (min-width: 960px) {
+  .flz-ags-settings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .flz-ags-settings-card--organisation,
+  .flz-ags-settings-card--classes,
+  .flz-ags-settings-help {
+    grid-column: span 2;
   }
 }
 

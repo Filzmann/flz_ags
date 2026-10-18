@@ -48,8 +48,8 @@ $page_picker_row = static function (
 
 <?php echo $ui->form_start(array('method' => 'post', 'action' => admin_url('admin-post.php'), 'nonce' => 'flz_ags_save_settings', 'hidden' => array('action' => 'flz_ags_save_settings'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formular. ?>
     <div class="flz-ags-settings-grid">
-        <section class="flz-ags-settings-card">
-            <h2>Grunddaten</h2>
+        <section class="flz-ags-settings-card flz-ags-settings-card--organisation">
+            <h2>Organisation</h2>
             <table class="form-table" role="presentation">
                 <tbody>
                     <tr>
@@ -83,7 +83,7 @@ $page_picker_row = static function (
             <?php endif; ?>
         </section>
 
-        <section class="flz-ags-settings-card">
+        <section class="flz-ags-settings-card flz-ags-settings-card--classes">
             <h2>Klassen im Anmeldeformular</h2>
             <p class="description">Schüler*innen wählen hier ihre echte Klasse, z. B. 7.1 oder 8.5. Für AG-Zielgruppen wird beim Absenden automatisch nur der Jahrgang geprüft.</p>
             <table class="form-table" role="presentation">
@@ -102,15 +102,9 @@ $page_picker_row = static function (
                     </tr>
                 </tbody>
             </table>
-            <h3>Anmeldezeitraum für Klasse 7</h3>
-            <p class="description">Im aktiven Zeitraum kann jede Schülerin und jeder Schüler der 7. Klassen nur eine aktive AG auswählen. Danach gelten wieder die Einstellungen zur Mehrfachanmeldung.</p>
-            <table class="form-table" role="presentation"><tbody>
-                <tr><th scope="row"><label for="flz_ags_registration_grade_7_exclusive_start">Startdatum</label></th><td><?php echo $ui->input('date', array('name' => 'registration_grade_7_exclusive_start', 'id' => 'flz_ags_registration_grade_7_exclusive_start', 'value' => flz_ags_registration_grade_7_exclusive_start(), 'description' => 'Leer lassen, um die Sonderregel auszuschalten.')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?></td></tr>
-                <tr><th scope="row"><label for="flz_ags_registration_grade_7_exclusive_days">Dauer</label></th><td><?php echo $ui->input('number', array('name' => 'registration_grade_7_exclusive_days', 'id' => 'flz_ags_registration_grade_7_exclusive_days', 'value' => flz_ags_registration_grade_7_exclusive_days(), 'min' => 1, 'max' => 31, 'description' => 'Tage ab Startdatum; Vorgabe sind sieben Tage.')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?></td></tr>
-            </tbody></table>
         </section>
 
-        <section class="flz-ags-settings-card">
+        <section class="flz-ags-settings-card flz-ags-settings-card--registration">
             <h2>Anmeldung</h2>
             <table class="form-table" role="presentation">
                 <tbody>
@@ -118,6 +112,24 @@ $page_picker_row = static function (
                         <th scope="row">Mehrfachanmeldung</th>
                         <td>
                             <?php echo $ui->field(array('type' => 'checkbox', 'name' => 'multiple_registrations_enabled', 'label' => 'Mehrere AG-Anmeldungen pro Schüler*in und Schuljahr erlauben', 'checked' => flz_ags_multiple_registrations_enabled(), 'description' => 'Ist diese Option aus, bleibt genau eine aktive AG-Anmeldung pro Schüler*in und Schuljahr erlaubt. Dieselbe AG kann nie doppelt aktiv gebucht werden.')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+                        </td>
+                    </tr>
+                    <tr class="flz-ags-settings-section-row">
+                        <th colspan="2" scope="colgroup">
+                            <h3>Anmeldezeitraum für Klasse 7</h3>
+                            <p class="description">Im aktiven Zeitraum kann jede Schülerin und jeder Schüler der 7. Klassen nur eine aktive AG auswählen.</p>
+                        </th>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="flz_ags_registration_grade_7_exclusive_start">Startdatum Klasse 7</label></th>
+                        <td>
+                            <?php echo $ui->input('date', array('name' => 'registration_grade_7_exclusive_start', 'id' => 'flz_ags_registration_grade_7_exclusive_start', 'value' => flz_ags_registration_grade_7_exclusive_start(), 'description' => 'Leer lassen, um die Ein-AG-Regel für Klasse 7 auszuschalten.')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="flz_ags_registration_grade_7_exclusive_days">Dauer Klasse 7</label></th>
+                        <td>
+                            <?php echo $ui->input('number', array('name' => 'registration_grade_7_exclusive_days', 'id' => 'flz_ags_registration_grade_7_exclusive_days', 'value' => flz_ags_registration_grade_7_exclusive_days(), 'min' => 1, 'max' => 31, 'description' => 'Tage ab dem Startdatum; Vorgabe sind sieben Tage.')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
                         </td>
                     </tr>
                     <tr>
@@ -130,7 +142,7 @@ $page_picker_row = static function (
             </table>
         </section>
 
-        <section class="flz-ags-settings-card">
+        <section class="flz-ags-settings-card flz-ags-settings-card--privacy">
             <h2>Datenschutz und Aufbewahrung</h2>
             <p class="description">Die Frist zählt immer ab dem ursprünglichen Anmeldedatum. Ein Widerruf oder eine spätere Bearbeitung verlängert sie nicht.</p>
             <table class="form-table" role="presentation">
@@ -151,14 +163,14 @@ $page_picker_row = static function (
             </table>
         </section>
 
-        <section class="flz-ags-settings-card flz-ags-settings-help">
-            <h2>Was bedeutet das?</h2>
+        <details class="flz-ags-settings-help">
+            <summary>Hinweise zu AG-Hauptseite, Detailseiten und Klassen</summary>
             <ul>
                 <li><strong>AG-Hauptseite:</strong> öffentliche Übersichtsseite, unter der die einzelnen AG-Detailseiten liegen.</li>
                 <li><strong>Detailseiten:</strong> auf ihnen erscheint automatisch der Anmeldebutton mit Formular.</li>
                 <li><strong>Klassen:</strong> nur für das Anmeldeformular. Die AG-Freigabe selbst arbeitet weiter mit Jahrgängen.</li>
             </ul>
-        </section>
+        </details>
     </div>
     <p class="submit"><?php echo $ui->button_save(array('label' => 'Einstellungen speichern')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?></p>
 <?php echo $ui->form_end(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formularende. ?>
