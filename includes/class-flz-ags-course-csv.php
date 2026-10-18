@@ -23,9 +23,27 @@ final class FLZ_AGS_Course_CSV
      */
     public static function header(): array
     {
+        return self::combined_header();
+    }
+
+    /** @return array<int,string> */
+    public static function course_header(): array
+    {
         return array(
-            'Zeitraum', 'AG', 'Kurzbeschreibung', 'Beschreibung', 'Bild-URL', 'Detailseite', 'Kategorie', 'AG-Leitung', 'Jahrgänge', 'Nur Klasse 7', 'Aktiv', 'Sichtbar', 'Anmeldung offen', 'Sortierung', 'Wochentag', 'Beginn', 'Ende', 'Raum', 'Maximale Teilnehmende', 'Termin aktiv', 'Termin-Sortierung',
+            'Zeitraum', 'AG', 'Kurzbeschreibung', 'Beschreibung', 'Bild-URL', 'Detailseite', 'Kategorie', 'AG-Leitung', 'Jahrgänge', 'Nur Klasse 7', 'Aktiv', 'Sichtbar', 'Anmeldung offen', 'Sortierung',
         );
+    }
+
+    /** @return array<int,string> */
+    public static function slot_header(): array
+    {
+        return array('Zeitraum', 'AG', 'Wochentag', 'Beginn', 'Ende', 'Raum', 'Maximale Teilnehmende', 'Aktiv', 'Sortierung');
+    }
+
+    /** @return array<int,string> */
+    private static function combined_header(): array
+    {
+        return array_merge(self::course_header(), array('Wochentag', 'Beginn', 'Ende', 'Raum', 'Maximale Teilnehmende', 'Termin aktiv', 'Termin-Sortierung'));
     }
 
     public static function course_key(string $school_year, string $slug): string
@@ -92,6 +110,72 @@ final class FLZ_AGS_Course_CSV
         }
 
         return $rows;
+    }
+
+    /** @param array<int,object> $courses @return array<int,array<int,string|int>> */
+    public static function export_course_rows(array $courses, ?callable $detail_page_path = null): array
+    {
+        $rows = self::export_rows($courses, static fn(int $course_id): array => array(), $detail_page_path);
+        return array_map(static fn(array $row): array => array_slice($row, 0, count(self::course_header())), $rows);
+    }
+
+    /** @param array<int,object> $courses @return array<int,array<int,string|int>> */
+    public static function export_slot_rows(array $courses, callable $slots_for_course): array
+    {
+        $rows = array();
+        foreach ($courses as $course) {
+            foreach ($slots_for_course((int) $course->id) as $slot) {
+                $rows[] = array((string) $course->school_year, (string) $course->title, (int) $slot->weekday, (string) $slot->start_time, (string) $slot->end_time, (string) $slot->room, (int) $slot->max_participants, (int) $slot->is_active, (int) $slot->sort_order);
+            }
+        }
+        return $rows;
+    }
+
+    /** @param array<int,array<int,string|null>> $raw_rows */
+    public static function is_slot_csv(array $raw_rows): bool
+    {
+        return !empty($raw_rows) && array_map(array(self::class, 'decode_cell'), (array) $raw_rows[0]) === self::slot_header();
+    }
+
+    /** @param array<int,array<int,string|null>> $raw_rows @return array<string,array{school_year:string,title:string,slots:array<int,array<string,mixed>>}> */
+    public static function parse_slot_csv(array $raw_rows): array
+    {
+        if (!self::is_slot_csv($raw_rows)) {
+            throw new UnexpectedValueException('Die Termin-CSV-Kopfzeile entspricht nicht dem erwarteten Format.');
+        }
+        array_shift($raw_rows);
+        $result = array();
+        foreach ($raw_rows as $index => $raw_row) {
+            $line = $index + 2;
+            $row = array_map(array(self::class, 'decode_cell'), is_array($raw_row) ? $raw_row : array());
+            if (count($row) !== count(self::slot_header())) {
+                throw new UnexpectedValueException('CSV-Zeile ' . $line . ' besitzt nicht die erwartete Spaltenzahl.');
+            }
+            $school_year = self::school_year($row[0], $line);
+            $title = sanitize_text_field($row[1]);
+            $slug = sanitize_title($title);
+            if ('' === $title || '' === $slug) {
+                throw new UnexpectedValueException('CSV-Zeile ' . $line . ' enthält keinen gültigen AG-Titel.');
+            }
+            $weekday = self::nonnegative_integer($row[2], $line, 'Wochentag');
+            $start = self::time($row[3], $line, 'Beginn');
+            $end = self::time($row[4], $line, 'Ende');
+            if ($weekday < 1 || $weekday > 7 || $end <= $start) {
+                throw new UnexpectedValueException('CSV-Zeile ' . $line . ' enthält keinen gültigen Termin.');
+            }
+            $key = self::course_key($school_year, $slug);
+            $slot_key = implode('|', array($weekday, $start, $end, strtolower(sanitize_text_field($row[5]))));
+            if (isset($result[$key]['slot_keys'][$slot_key])) {
+                throw new UnexpectedValueException('CSV-Zeile ' . $line . ' enthält einen Termin mehrfach.');
+            }
+            $result[$key] ??= array('school_year' => $school_year, 'title' => $title, 'slots' => array(), 'slot_keys' => array());
+            $result[$key]['slot_keys'][$slot_key] = true;
+            $result[$key]['slots'][] = array('weekday' => $weekday, 'start_time' => $start, 'end_time' => $end, 'room' => sanitize_text_field($row[5]), 'max_participants' => self::nonnegative_integer($row[6], $line, 'Maximale Teilnehmende'), 'is_active' => self::boolean($row[7], $line, 'Aktiv'), 'sort_order' => self::integer($row[8], $line, 'Sortierung'));
+        }
+        foreach ($result as &$item) { unset($item['slot_keys']); }
+        unset($item);
+        if (empty($result)) { throw new UnexpectedValueException('Die Termin-CSV enthält keine Datensätze.'); }
+        return $result;
     }
 
     /**
@@ -368,7 +452,7 @@ final class FLZ_AGS_Course_CSV
             return $raw_rows;
         }
         $header = array_map(array(self::class, 'decode_cell'), (array) $raw_rows[0]);
-        if ($header !== self::header()) {
+        if ($header !== self::course_header() && $header !== self::combined_header()) {
             return $raw_rows;
         }
 

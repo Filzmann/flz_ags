@@ -161,6 +161,24 @@ $page_picker_row = static function (
                     </tr>
                 </tbody>
             </table>
+
+            <h3>Alte Anmeldungen jetzt löschen</h3>
+            <p>Entfernt dauerhaft alle Anmeldungen, deren Anmeldedatum länger als <?php echo esc_html((string) $registration_retention_months); ?> Monate zurückliegt. Erstellen Sie bei Bedarf vorher auf der Seite „Anmeldungen“ ein CSV-Backup.</p>
+            <?php
+            // phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped Felder und Button vollständig; das zugehörige Formular folgt nach dem Einstellungsformular.
+            echo $ui->field(array(
+                'type' => 'checkbox',
+                'name' => 'confirm_delete_old_registrations',
+                'label' => 'Ich bestätige die dauerhafte Löschung der abgelaufenen Anmeldungen.',
+                'attrs' => array('form' => 'flz-ags-delete-old-registrations'),
+            ));
+            echo $ui->button_delete(array(
+                'label' => 'Alte Anmeldungen dauerhaft löschen',
+                'confirm' => 'Alte Anmeldungen jetzt dauerhaft löschen? Dieser Schritt kann nur mit einem CSV-Backup rückgängig gemacht werden.',
+                'attrs' => array('form' => 'flz-ags-delete-old-registrations'),
+            ));
+            // phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
+            ?>
         </section>
 
         <details class="flz-ags-settings-help">
@@ -175,30 +193,18 @@ $page_picker_row = static function (
     <p class="submit"><?php echo $ui->button_save(array('label' => 'Einstellungen speichern')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?></p>
 <?php echo $ui->form_end(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formularende. ?>
 
-<section class="flz-ags-settings-card">
-    <h2>Alte Anmeldungen jetzt löschen</h2>
-    <p>Entfernt dauerhaft alle Anmeldungen, deren Anmeldedatum länger als <?php echo esc_html((string) $registration_retention_months); ?> Monate zurückliegt. Erstellen Sie bei Bedarf vorher auf der Seite „Anmeldungen“ ein CSV-Backup.</p>
-    <?php
-    // phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped Formular, Nonce und Felder vollständig.
-    echo $ui->form_start(array(
-        'method' => 'post',
-        'action' => esc_url(admin_url('admin-post.php')),
-        'nonce' => 'flz_ags_delete_old_registrations',
-        'hidden' => array('action' => 'flz_ags_delete_old_registrations'),
-    ));
-    echo $ui->field(array(
-        'type' => 'checkbox',
-        'name' => 'confirm_delete_old_registrations',
-        'label' => 'Ich bestätige die dauerhafte Löschung der abgelaufenen Anmeldungen.',
-    ));
-    echo $ui->button_delete(array(
-        'label' => 'Alte Anmeldungen dauerhaft löschen',
-        'confirm' => 'Alte Anmeldungen jetzt dauerhaft löschen? Dieser Schritt kann nur mit einem CSV-Backup rückgängig gemacht werden.',
-    ));
-    echo $ui->form_end();
-    // phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
-    ?>
-</section>
+<?php
+// Das eigenständige Aktionsformular bleibt außerhalb des Einstellungsformulars; die Datenschutz-Controls sind per form-Attribut sicher zugeordnet.
+// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das unsichtbare Aktionsformular.
+echo $ui->form_start(array(
+    'method' => 'post',
+    'action' => esc_url(admin_url('admin-post.php')),
+    'nonce' => 'flz_ags_delete_old_registrations',
+    'hidden' => array('action' => 'flz_ags_delete_old_registrations'),
+    'attrs' => array('id' => 'flz-ags-delete-old-registrations'),
+)); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das unsichtbare Aktionsformular.
+echo $ui->form_end(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das unsichtbare Aktionsformular.
+?>
 
 <section class="flz-ags-settings-card">
     <h2>Lokaler Mail-Fallback</h2>

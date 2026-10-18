@@ -40,4 +40,14 @@ if ( ! str_contains( $css, 'grid-template-columns: minmax(0, 1fr)' ) ) {
 	throw new RuntimeException( 'Die mobile einspaltige Darstellung der Einstellungen ist nicht abgesichert.' );
 }
 
+$privacy_start = strpos( $settings, 'flz-ags-settings-card--privacy' );
+$privacy_end   = false === $privacy_start ? false : strpos( $settings, '</section>', $privacy_start );
+$delete_action = strpos( $settings, 'Alte Anmeldungen jetzt löschen' );
+if ( false === $privacy_start || false === $privacy_end || false === $delete_action || $delete_action < $privacy_start || $delete_action > $privacy_end ) {
+	throw new RuntimeException( 'Die manuelle Löschung alter Anmeldungen gehört in den Datenschutzbereich.' );
+}
+if ( ! str_contains( $settings, "'form' => 'flz-ags-delete-old-registrations'" ) || ! str_contains( $settings, "'id' => 'flz-ags-delete-old-registrations'" ) ) {
+	throw new RuntimeException( 'Die Datenschutz-Löschung ist nicht ohne verschachtelte Formulare dem geschützten Aktionsformular zugeordnet.' );
+}
+
 echo "OK: flz_ags compact settings layout smoke test\n";

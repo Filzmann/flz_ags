@@ -65,6 +65,8 @@ natcasesort($slot_options);
 echo $ui->csv_panel(array(
 	'title'       => 'Anmeldungs-Backup als CSV',
 	'description' => 'Lädt alle Status des gewählten Schuljahrs in einem wiederherstellbaren Format herunter.',
+	'format'      => 'Zeitraum; Status; Klasse; Jahrgang; Nachname; Vorname; E-Mail; Datenschutz bestätigt; AG; Wochentag; Beginn; Ende; Raum; Abgemeldet am; Abmeldegrund; Angemeldet am; Zuletzt geändert',
+	'format_description' => '<strong>Zeitraum</strong>: Schuljahr. <strong>Datenschutz bestätigt</strong>: 1 = ja, 0 = nein. <strong>Wochentag</strong>: 1 bis 7. Datumsangaben verwenden JJJJ-MM-TT HH:MM:SS.',
 	'export'      => array(
 		'href'  => esc_url($export_url),
 		'label' => 'Anmeldungs-CSV herunterladen',

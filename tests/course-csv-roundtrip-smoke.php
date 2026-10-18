@@ -102,6 +102,11 @@ flz_ags_csv_assert( $parsed['2026/2027|schach-ag']['course']['title'] === 'Schac
 flz_ags_csv_assert( $parsed['2026/2027|schach-ag']['course']['detail_page_path'] === 'ags/schach-ag', 'Der Roundtrip erhält den portablen Detailseitenpfad nicht.' );
 flz_ags_csv_assert( ! in_array( 'detail_page_id', FLZ_AGS_Course_CSV::header(), true ), 'Der CSV-Vertrag exportiert weiterhin installationsabhängige Seiten-IDs.' );
 
+$slot_rows = FLZ_AGS_Course_CSV::export_slot_rows(array($course), static fn(int $course_id): array => 17 === $course_id ? array($slot) : array());
+$parsed_slots = FLZ_AGS_Course_CSV::parse_slot_csv(array_merge(array(FLZ_AGS_Course_CSV::slot_header()), $slot_rows));
+flz_ags_csv_assert(isset($parsed_slots['2026/2027|schach-ag']), 'Die getrennte Termin-CSV lässt sich nicht wieder einlesen.');
+flz_ags_csv_assert(1 === count($parsed_slots['2026/2027|schach-ag']['slots']), 'Der getrennte Termin-CSV-Import verliert Termine.');
+
 $course_only_rows = FLZ_AGS_Course_CSV::export_rows(
 	array( $course ),
 	static fn( int $course_id ): array => array(),
@@ -199,7 +204,8 @@ $export_start = strpos( $plugin_source, 'public function handle_export_courses_c
 $export_end = strpos( $plugin_source, 'public function handle_import_courses_csv(): void', $export_start ?: 0 );
 flz_ags_csv_assert( false !== $export_start && false !== $export_end, 'Der AG-CSV-Export-Handler konnte nicht isoliert geprüft werden.' );
 $export_source = substr( $plugin_source, $export_start, $export_end - $export_start );
-flz_ags_csv_assert( str_contains( $export_source, "isset(\$_GET['include_slots'])" ), 'Der AG-CSV-Export wertet die Slot-Checkbox nicht aus.' );
+flz_ags_csv_assert( str_contains( $export_source, 'FLZ_AGS_Course_CSV::export_course_rows' ), 'Der AG-CSV-Export erzeugt keine getrennte Stammdaten-Datei.' );
+flz_ags_csv_assert( str_contains( $plugin_source, 'handle_export_slots_csv' ), 'Der getrennte AG-Termin-CSV-Export fehlt.' );
 $import_start = strpos( $plugin_source, 'public function handle_import_courses_csv(): void' );
 $import_end = strpos( $plugin_source, 'public function handle_export_csv(): void', $import_start ?: 0 );
 flz_ags_csv_assert( false !== $import_start && false !== $import_end, 'Der AG-CSV-Import-Handler konnte nicht isoliert geprüft werden.' );
@@ -209,6 +215,7 @@ flz_ags_csv_assert( str_contains( $import_source, "check_admin_referer('flz_ags_
 flz_ags_csv_assert( ! str_contains( $import_source, 'submit_csv_dry_run' ), 'Der AG-CSV-Import enthält weiterhin einen irritierenden Dry-Run.' );
 flz_ags_csv_assert( ! str_contains( $import_source, 'hash_equals(' ), 'Der direkte AG-CSV-Import verlangt weiterhin einen Dry-Run-Nachweis.' );
 flz_ags_csv_assert( str_contains( $import_source, 'FLZ_AGS_Course_CSV::parse_tolerant(' ), 'Der AG-CSV-Import verwendet nicht die fehlertolerante Aufbereitung.' );
+flz_ags_csv_assert( str_contains( $import_source, 'FLZ_AGS_Course_CSV::parse_slot_csv(' ), 'Der AG-CSV-Import erkennt keine getrennte Termin-Datei.' );
 flz_ags_csv_assert( str_contains( $import_source, "\$school_year_mode = isset(\$_POST['school_year_mode'])" ), 'Der Import wertet die Wahl des Schuljahrmodus nicht aus.' );
 flz_ags_csv_assert( str_contains( $import_source, 'FLZ_AGS_Course_CSV::remap_school_year(' ), 'Der Import überträgt CSV-Daten nicht in das ausgewählte Zielschuljahr.' );
 flz_ags_csv_assert( str_contains( $import_source, "'school_year' => 'replace' === \$school_year_mode ? \$target_school_year : \$school_year" ), 'Nach einer Schuljahrübertragung zeigt die AG-Liste nicht das Zielschuljahr.' );
@@ -222,8 +229,8 @@ flz_ags_csv_assert( str_contains( $template_source, "\$ui->input('file'" ) && st
 flz_ags_csv_assert( substr_count( $template_source, "array('name' => 'submit_csv')" ) === 1, 'Die AG-Liste zeigt mehr als eine CSV-Upload-Aktion an.' );
 flz_ags_csv_assert( str_contains( $template_source, 'flz-ags-csv-report' ), 'Die AG-Liste zeigt keinen eigenen verständlichen Importbericht an.' );
 flz_ags_csv_assert( str_contains( $template_source, 'Hinweise zum letzten CSV-Import' ), 'Der Importbericht besitzt keine verständliche Überschrift.' );
-flz_ags_csv_assert( str_contains( $template_source, "'name' => 'include_slots'" ), 'Das Exportformular bietet keine Checkbox für Termine/Slots.' );
-flz_ags_csv_assert( str_contains( $template_source, 'Termine/Slots mit exportieren' ), 'Die Export-Checkbox ist nicht verständlich beschriftet.' );
+flz_ags_csv_assert( str_contains( $template_source, 'AG-Stammdaten herunterladen' ), 'Der Stammdaten-Download ist nicht verständlich beschriftet.' );
+flz_ags_csv_assert( str_contains( $template_source, 'AG-Termine herunterladen' ), 'Der getrennte Termin-Download ist nicht verständlich beschriftet.' );
 flz_ags_csv_assert( str_contains( $template_source, "'name' => 'school_year_mode'" ), 'Das Importformular bietet keine Wahl für den Umgang mit dem Schuljahr.' );
 flz_ags_csv_assert( str_contains( $template_source, 'Schuljahre aus CSV behalten' ), 'Der Beibehalten-Modus ist nicht verständlich beschriftet.' );
 flz_ags_csv_assert( str_contains( $template_source, 'Alle AGs in folgendes Schuljahr importieren' ), 'Der Zielschuljahr-Modus ist nicht verständlich beschriftet.' );

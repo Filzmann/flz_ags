@@ -26,8 +26,10 @@ $checks = array(
 	array(
 		str_contains( $template_source, '<details class="flz-ags-csv-details"' )
 		&& str_contains( $template_source, '<summary' )
-		&& str_contains( $template_source, 'AGs und Termine als CSV' ),
-		'Der CSV-Bereich ist keine native, einklappbare Leiste.',
+		&& str_contains( $template_source, 'AGs und Termine als CSV' )
+		&& str_contains( $style_source, '.flz-ags-csv-details .flz-ui-csv-panel__actions' )
+		&& str_contains( $style_source, 'grid-template-columns: repeat(2, minmax(0, 1fr))' ),
+		'Der CSV-Bereich ist nicht als native, einklappbare Zweispalten-Leiste umgesetzt.',
 	),
 	array(
 		str_contains( $template_source, 'flz-ags-admin-toolbar' )

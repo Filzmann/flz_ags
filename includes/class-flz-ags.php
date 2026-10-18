@@ -45,6 +45,7 @@ class FLZ_AGS_Plugin
         add_action('admin_post_flz_ags_delete_old_registrations', array($this, 'handle_delete_old_registrations'));
         add_action('admin_post_flz_ags_clear_mock_mail_capture', array($this, 'handle_clear_mock_mail_capture'));
         add_action('admin_post_flz_ags_export_courses_csv', array($this, 'handle_export_courses_csv'));
+        add_action('admin_post_flz_ags_export_slots_csv', array($this, 'handle_export_slots_csv'));
         add_action('admin_post_flz_ags_import_courses_csv', array($this, 'handle_import_courses_csv'));
         add_action('admin_post_flz_ags_install_demo', array($this, 'handle_install_demo'));
         add_action('wp_ajax_flz_ags_search_detail_pages', array($this, 'ajax_search_detail_pages'));
@@ -1606,7 +1607,7 @@ class FLZ_AGS_Plugin
     }
 
     /**
-     * Streamt die AGs des gewählten Schuljahrs einschließlich ihrer Termine.
+     * Streamt die AG-Stammdaten des gewählten Schuljahrs.
      */
     public function handle_export_courses_csv(): void
     {
@@ -1616,13 +1617,10 @@ class FLZ_AGS_Plugin
         $school_year = isset($_GET['school_year'])
             ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_GET['school_year'])))
             : flz_ags_current_school_year();
-        $include_slots = isset($_GET['include_slots']);
-
         try {
             $courses = $this->get_courses($school_year, false);
-            $rows = FLZ_AGS_Course_CSV::export_rows(
+            $rows = FLZ_AGS_Course_CSV::export_course_rows(
                 $courses,
-                fn(int $course_id): array => $include_slots ? $this->get_course_slots($course_id, true) : array(),
                 static function (int $detail_page_id): string {
                     $path = get_page_uri($detail_page_id);
                     if (!is_string($path) || '' === trim($path)) {
@@ -1632,9 +1630,9 @@ class FLZ_AGS_Plugin
                 }
             );
             flz_wpdb_objects_send_csv_download(
-                FLZ_AGS_Course_CSV::header(),
+                FLZ_AGS_Course_CSV::course_header(),
                 $rows,
-                'flz-ags-' . sanitize_file_name($school_year) . ($include_slots ? '-mit-slots' : '-ohne-slots') . '.csv'
+                'flz-ags-' . sanitize_file_name($school_year) . '.csv'
             );
         } catch (Throwable $error) {
             $this->redirect_admin_error(
@@ -1643,6 +1641,24 @@ class FLZ_AGS_Plugin
                 'course-export',
                 array('page' => 'flz-ags', 'school_year' => $school_year)
             );
+        }
+    }
+
+    /** Streamt die Termine des gewählten Schuljahrs getrennt von den AG-Stammdaten. */
+    public function handle_export_slots_csv(): void
+    {
+        $this->assert_admin_permission();
+        check_admin_referer('flz_ags_export_slots_csv');
+        $school_year = isset($_GET['school_year']) ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_GET['school_year']))) : flz_ags_current_school_year();
+        try {
+            $courses = $this->get_courses($school_year, false);
+            flz_wpdb_objects_send_csv_download(
+                FLZ_AGS_Course_CSV::slot_header(),
+                FLZ_AGS_Course_CSV::export_slot_rows($courses, fn(int $course_id): array => $this->get_course_slots($course_id, true)),
+                'flz-ag-termine-' . sanitize_file_name($school_year) . '.csv'
+            );
+        } catch (Throwable $error) {
+            $this->redirect_admin_error($error, 'Erstellen des AG-Termin-CSV-Exports', 'slot-export', array('page' => 'flz-ags', 'school_year' => $school_year));
         }
     }
 
@@ -1673,13 +1689,10 @@ class FLZ_AGS_Plugin
 
         try {
             $this->assert_course_csv_upload();
-            $parsed = FLZ_AGS_Course_CSV::parse_tolerant(
-                flz_wpdb_objects_read_uploaded_csv(
-                    'course-csv',
-                    'Einlesen der AG-/Slot-CSV-Datei',
-                    false
-                )
-            );
+            $raw_csv = flz_wpdb_objects_read_uploaded_csv('course-csv', 'Einlesen der AG-/Termin-CSV-Datei', false);
+            $parsed = FLZ_AGS_Course_CSV::is_slot_csv($raw_csv)
+                ? $this->slot_csv_import_data(FLZ_AGS_Course_CSV::parse_slot_csv($raw_csv))
+                : FLZ_AGS_Course_CSV::parse_tolerant($raw_csv);
             if ('replace' === $school_year_mode) {
                 $parsed = FLZ_AGS_Course_CSV::remap_school_year($parsed, $target_school_year);
             }
@@ -1721,6 +1734,37 @@ class FLZ_AGS_Plugin
                 array('page' => 'flz-ags', 'school_year' => $school_year)
             );
         }
+    }
+
+    /** @param array<string,array{school_year:string,title:string,slots:array<int,array<string,mixed>>}> $slot_items @return array{courses:array<string,array{course:array<string,mixed>,slots:array<int,array<string,mixed>>}>,warnings:array<int,string>} */
+    private function slot_csv_import_data(array $slot_items): array
+    {
+        $courses = array();
+        $warnings = array();
+        foreach ($slot_items as $key => $item) {
+            $found = null;
+            foreach ($this->get_courses($item['school_year'], false) as $candidate) {
+                if (FLZ_AGS_Course_CSV::course_key((string) $candidate->school_year, (string) $candidate->slug) === $key) {
+                    $found = $candidate;
+                    break;
+                }
+            }
+            if (!$found) {
+                $warnings[] = 'Termine für AG „' . $item['title'] . '“ wurden übersprungen: Die AG existiert im angegebenen Zeitraum nicht.';
+                continue;
+            }
+            $detail_path = !empty($found->detail_page_id) ? (string) get_page_uri((int) $found->detail_page_id) : '';
+            $courses[$key] = array('course' => array(
+                'school_year' => (string) $found->school_year, 'title' => (string) $found->title, 'slug' => (string) $found->slug,
+                'short_description' => (string) $found->short_description, 'description' => (string) $found->description,
+                'image_url' => (string) $found->image_url, 'detail_page_path' => $detail_path, 'category' => (string) $found->category,
+                'leader_name' => (string) $found->leader_name, 'allowed_grades' => (string) $found->allowed_grades,
+                'only_grade_7' => (int) $found->only_grade_7, 'is_active' => (int) $found->is_active,
+                'is_visible' => (int) $found->is_visible, 'registration_open' => (int) $found->registration_open, 'sort_order' => (int) $found->sort_order,
+            ), 'slots' => $item['slots']);
+        }
+        if (empty($courses)) { throw new UnexpectedValueException('Die Termin-CSV enthält keine Termine für vorhandene AGs.'); }
+        return array('courses' => $courses, 'warnings' => $warnings);
     }
 
     /**

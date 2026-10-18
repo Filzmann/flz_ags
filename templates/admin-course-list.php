@@ -28,8 +28,9 @@ natcasesort($category_options);
 			<summary>CSV-Import und -Export</summary>
 			<section class="flz-ui-panel flz-ui-csv-panel">
 				<h3 class="flz-ui-panel__title">AGs und Termine als CSV</h3>
-				<p class="flz-ui-panel__description">CSV herunterladen oder direkt hochladen. Beim Import werden vorhandene Slot-Zeilen automatisch erkannt. Fehlende optionale Werte erhalten sichere Standardwerte; fehlerhafte Einzelzeilen werden anschließend mit Zeilennummer erklärt.</p>
-				<p class="flz-ui-csv-panel__format"><strong>Format:</strong> <code>format_version; record_type; course_key; school_year; course_*; slot_*</code></p>
+				<p class="flz-ui-panel__description">AG-Stammdaten und Termine werden getrennt heruntergeladen, damit beide Dateien übersichtlich in Excel bearbeitet werden können. Bestehende kombinierte Sicherungsdateien bleiben beim Import lesbar.</p>
+				<p class="flz-ui-csv-panel__format"><strong>AG-Format:</strong> <code>Zeitraum; AG; Kurzbeschreibung; Beschreibung; Bild-URL; Detailseite; Kategorie; AG-Leitung; Jahrgänge; Nur Klasse 7; Aktiv; Sichtbar; Anmeldung offen; Sortierung</code></p>
+				<p class="flz-ui-csv-panel__format-description"><strong>Zeitraum</strong>: Schuljahr (z. B. 2026/2027). <strong>AG</strong>: Titel der Arbeitsgemeinschaft. Schalterspalten verwenden 1 für Ja und 0 für Nein. Die separate Termin-Datei enthält Zeitraum, AG, Wochentag, Beginn, Ende, Raum, maximale Teilnehmende, Aktiv und Sortierung.</p>
 				<div class="flz-ui-csv-panel__actions">
 					<?php
 					// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped Formulare, Nonces und Felder vollständig.
@@ -42,13 +43,14 @@ natcasesort($category_options);
 							'school_year' => $school_year,
 						),
 					));
-					echo $ui->field(array(
-						'type'    => 'checkbox',
-						'name' => 'include_slots',
-						'label'   => 'Termine/Slots mit exportieren',
-						'checked' => true,
+					echo $ui->button_export(array('label' => 'AG-Stammdaten herunterladen', 'type' => 'submit', 'hide_label' => false));
+					echo $ui->form_end();
+
+					echo $ui->form_start(array(
+						'method' => 'get', 'action' => esc_url(admin_url('admin-post.php')), 'nonce' => 'flz_ags_export_slots_csv',
+						'hidden' => array('action' => 'flz_ags_export_slots_csv', 'school_year' => $school_year),
 					));
-					echo $ui->button_export(array('label' => 'AG-CSV herunterladen', 'type' => 'submit'));
+					echo $ui->button_export(array('label' => 'AG-Termine herunterladen', 'type' => 'submit', 'hide_label' => false));
 					echo $ui->form_end();
 
 					echo $ui->form_start(array(
@@ -64,7 +66,7 @@ natcasesort($category_options);
 					echo $ui->input('file', array(
 						'name'   => 'course-csv',
 						'id'     => 'flz-ags-course-csv-import',
-						'label'  => 'AG-CSV-Datei',
+						'label'  => 'CSV-Datei (AG-Stammdaten, AG-Termine oder bisherige kombinierte Sicherung)',
 						'accept' => '.csv',
 					));
 					echo $ui->field(array(
