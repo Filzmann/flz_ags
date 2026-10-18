@@ -74,6 +74,16 @@ jobs:
     name: PHP-Coverage
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    services:
+      mysql:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=5
     steps:
       - name: Plugin auschecken
         uses: actions/checkout@v7
@@ -95,6 +105,22 @@ jobs:
           repository: Filzmann/flz_wpdb_objects
           ref: ${{ steps.coverage-wpdb-ref.outputs.ref }}
           path: flz_wpdb_objects
+      - name: flz_ui_components-Referenz bestimmen
+        id: coverage-ui-ref
+        env:
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/Filzmann/flz_ui_components.git "refs/heads/$CANDIDATE_REF" >/dev/null 2>&1; then
+            echo "ref=$CANDIDATE_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+      - name: flz_ui_components auschecken
+        uses: actions/checkout@v7
+        with:
+          repository: Filzmann/flz_ui_components
+          ref: ${{ steps.coverage-ui-ref.outputs.ref }}
+          path: flz_ui_components
       - name: Quality-Workspace-Referenz bestimmen
         id: quality-ref
         env:
@@ -122,13 +148,102 @@ jobs:
         run: |
           composer install --working-dir=flz_ags --no-interaction --no-progress --prefer-dist
           composer install --working-dir=tagore-plugins/tests/coverage --no-interaction --no-progress --prefer-dist
+      - name: WordPress-Testumgebung installieren
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes subversion default-mysql-client
+          cd flz_ags
+          WP_TESTS_DIR="$RUNNER_TEMP/wordpress-tests-lib" \
+          WP_CORE_DIR="$RUNNER_TEMP/wordpress" \
+          ./tests/bin/install-wp-tests.sh flz_ags_tests root root 127.0.0.1:3306 7.1
       - name: PHP-Line-Coverage messen
+        env:
+          TAGORE_COVERAGE_PHPUNIT: '1'
+          WP_TESTS_DIR: ${{ runner.temp }}/wordpress-tests-lib
+          WP_TESTS_PHPUNIT_POLYFILLS_PATH: ${{ github.workspace }}/flz_ags/vendor/yoast/phpunit-polyfills
+          FLZ_WPDB_OBJECTS_DIR: ${{ github.workspace }}/flz_wpdb_objects
+          FLZ_UI_COMPONENTS_DIR: ${{ github.workspace }}/flz_ui_components
         run: |
           tagore-plugins/scripts/measure-component-php-coverage \
             flz_ags \
             flz_ags \
             "$GITHUB_WORKSPACE/tagore-plugins/tests/coverage/vendor/bin/phpcov" \
             "$RUNNER_TEMP/php-coverage"
+
+  wordpress-integration:
+    name: WordPress integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=5
+    steps:
+      - name: Plugin auschecken
+        uses: actions/checkout@v7
+        with:
+          path: flz_ags
+      - name: flz_wpdb_objects-Referenz bestimmen
+        id: integration-wpdb-ref
+        env:
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/Filzmann/flz_wpdb_objects.git "refs/heads/$CANDIDATE_REF" >/dev/null 2>&1; then
+            echo "ref=$CANDIDATE_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+      - name: flz_wpdb_objects auschecken
+        uses: actions/checkout@v7
+        with:
+          repository: Filzmann/flz_wpdb_objects
+          ref: ${{ steps.integration-wpdb-ref.outputs.ref }}
+          path: flz_wpdb_objects
+      - name: flz_ui_components-Referenz bestimmen
+        id: integration-ui-ref
+        env:
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/Filzmann/flz_ui_components.git "refs/heads/$CANDIDATE_REF" >/dev/null 2>&1; then
+            echo "ref=$CANDIDATE_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+      - name: flz_ui_components auschecken
+        uses: actions/checkout@v7
+        with:
+          repository: Filzmann/flz_ui_components
+          ref: ${{ steps.integration-ui-ref.outputs.ref }}
+          path: flz_ui_components
+      - name: PHP einrichten
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+      - name: Entwicklungsabhängigkeiten installieren
+        run: composer install --working-dir=flz_ags --no-interaction --no-progress --prefer-dist
+      - name: WordPress-Testumgebung installieren
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes subversion default-mysql-client
+          cd flz_ags
+          WP_TESTS_DIR="$RUNNER_TEMP/wordpress-tests-lib" \
+          WP_CORE_DIR="$RUNNER_TEMP/wordpress" \
+          ./tests/bin/install-wp-tests.sh flz_ags_tests root root 127.0.0.1:3306 7.1
+      - name: WordPress-Integration prüfen
+        env:
+          WP_TESTS_DIR: ${{ runner.temp }}/wordpress-tests-lib
+          WP_TESTS_PHPUNIT_POLYFILLS_PATH: ${{ github.workspace }}/flz_ags/vendor/yoast/phpunit-polyfills
+          FLZ_WPDB_OBJECTS_DIR: ${{ github.workspace }}/flz_wpdb_objects
+          FLZ_UI_COMPONENTS_DIR: ${{ github.workspace }}/flz_ui_components
+        run: flz_ags/vendor/bin/phpunit --configuration flz_ags/phpunit.xml.dist
 
   javascript:
     name: JavaScript-Coverage
