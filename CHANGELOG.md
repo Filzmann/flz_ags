@@ -5,6 +5,14 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 
 ## Unreleased
 
+## 0.7.4
+
+- AGs und Anmeldungen können wahlweise je Schuljahr oder Schulhalbjahr geführt werden; historische Jahresdaten bleiben erhalten.
+- Rolle „AG-Verwaltung“ ergänzt; sie erhält eine rein lesende Gesamtansicht aller Anmeldungen.
+- Für Klasse 7 ist ein konfigurierbarer, zeitlich begrenzter Ein-AG-Anmeldezeitraum verfügbar.
+- AG- und Anmeldungs-CSV verwenden verständliche Spaltenüberschriften; ältere Exporte bleiben importierbar.
+- Die Einstellungsseite ist nach Organisation, Anmeldung, Klassen und Datenschutz kompakt gegliedert.
+
 ## 0.7.3 – 2026-09-25
 
 - Raumangaben aus der öffentlichen AG-Übersicht entfernt; die Bestätigungsmail nennt den hinterlegten Raum ausschließlich als Ersttreffpunkt und verweist spätere Änderungen an die AG-Leitung.
