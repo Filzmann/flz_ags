@@ -381,6 +381,9 @@ class FLZ_AGS_Plugin
             }
             delete_transient($this->course_csv_report_key());
         }
+        if (isset($_GET['csv_checked']) && FlzCsvImportStage::exists('flzags:courses', get_current_user_id())) {
+            echo wp_kses_post(flz_ags_notice('Die AG-CSV wurde geprüft. Bitte bestätigen Sie jetzt den Import; eine erneute Dateiauswahl ist nicht nötig.', 'success'));
+        }
         if (isset($_GET['flz_ags_error'])) {
             $error_code = sanitize_key(wp_unslash($_GET['flz_ags_error']));
             $error_message = flz_ags_error_message($error_code);
@@ -527,6 +530,7 @@ class FLZ_AGS_Plugin
             'csv_report' => $csv_report,
             'target_school_year' => $target_school_year,
             'school_year_options' => $school_year_options,
+            'course_csv_stage_ready' => FlzCsvImportStage::exists('flzags:courses', get_current_user_id()),
         ));
     }
 
@@ -1481,6 +1485,9 @@ class FLZ_AGS_Plugin
             $error_code = sanitize_key(wp_unslash($_GET['flz_ags_error']));
             echo wp_kses_post(flz_ags_notice(flz_ags_error_message($error_code), 'error'));
         }
+        if (isset($_GET['csv_checked']) && $this->is_manager() && FlzCsvImportStage::exists('flzags:registrations', get_current_user_id())) {
+            echo wp_kses_post(flz_ags_notice('Die Anmeldungs-CSV wurde geprüft. Bitte bestätigen Sie jetzt den Import; eine erneute Dateiauswahl ist nicht nötig.', 'success'));
+        }
         if ($load_failed) {
             echo wp_kses_post(
                 flz_ags_notice('Die Anmeldungen konnten nicht geladen werden. Details stehen im Serverprotokoll.', 'error')
@@ -1493,6 +1500,7 @@ class FLZ_AGS_Plugin
             'slots' => $slots,
             'courses' => $courses,
             'csv_report' => $csv_report,
+            'registration_csv_stage_ready' => $this->is_manager() && FlzCsvImportStage::exists('flzags:registrations', get_current_user_id()),
         ));
         echo '</div>';
     }
@@ -1671,6 +1679,7 @@ class FLZ_AGS_Plugin
         check_admin_referer('flz_ags_import_courses_csv');
 
         $is_import = isset($_POST['submit_csv']);
+        $is_confirmation = isset($_POST['confirm_course_csv_import']);
         $school_year_mode = isset($_POST['school_year_mode'])
             ? sanitize_key(wp_unslash($_POST['school_year_mode']))
             : 'preserve';
@@ -1683,19 +1692,47 @@ class FLZ_AGS_Plugin
         $school_year = isset($_POST['school_year'])
             ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_POST['school_year'])))
             : flz_ags_current_school_year();
-        if (!$is_import) {
+        if (!$is_import && !$is_confirmation) {
             wp_die(esc_html__('Ungültige CSV-Aktion.', 'flz-ags'));
         }
 
         try {
-            $this->assert_course_csv_upload();
-            $raw_csv = flz_wpdb_objects_read_uploaded_csv('course-csv', 'Einlesen der AG-/Termin-CSV-Datei', false);
-            $parsed = FLZ_AGS_Course_CSV::is_slot_csv($raw_csv)
-                ? $this->slot_csv_import_data(FLZ_AGS_Course_CSV::parse_slot_csv($raw_csv))
-                : FLZ_AGS_Course_CSV::parse_tolerant($raw_csv);
-            if ('replace' === $school_year_mode) {
-                $parsed = FLZ_AGS_Course_CSV::remap_school_year($parsed, $target_school_year);
+            if ($is_import) {
+                $this->assert_course_csv_upload();
+                $raw_csv = flz_wpdb_objects_read_uploaded_csv('course-csv', 'Einlesen der AG-/Termin-CSV-Datei', false);
+                $parsed = FLZ_AGS_Course_CSV::is_slot_csv($raw_csv)
+                    ? $this->slot_csv_import_data(FLZ_AGS_Course_CSV::parse_slot_csv($raw_csv))
+                    : FLZ_AGS_Course_CSV::parse_tolerant($raw_csv);
+                if ('replace' === $school_year_mode) {
+                    $parsed = FLZ_AGS_Course_CSV::remap_school_year($parsed, $target_school_year);
+                }
+                $plan = $this->build_course_csv_import_plan($parsed['courses'], $parsed['warnings']);
+                $stage = array(
+                    'parsed' => $parsed,
+                    'school_year_mode' => $school_year_mode,
+                    'target_school_year' => $target_school_year,
+                    'school_year' => $school_year,
+                );
+                FlzCsvImportStage::store('flzags:courses', get_current_user_id(), $stage, hash('sha256', serialize($stage)), 15 * MINUTE_IN_SECONDS);
+                flz_ags_safe_redirect(flz_ags_admin_url(array(
+                    'page' => 'flz-ags',
+                    'school_year' => 'replace' === $school_year_mode ? $target_school_year : $school_year,
+                    'csv_checked' => 1,
+                )));
             }
+
+            $stored_stage = FlzCsvImportStage::consume('flzags:courses', get_current_user_id());
+            if (!is_array($stored_stage) || !isset($stored_stage['rows'], $stored_stage['proof']) || !is_array($stored_stage['rows'])) {
+                throw new UnexpectedValueException('Der geprüfte CSV-Stand ist abgelaufen. Bitte prüfen Sie die Datei erneut.');
+            }
+            $stage = $stored_stage['rows'];
+            if (!hash_equals((string) $stored_stage['proof'], hash('sha256', serialize($stage))) || !isset($stage['parsed']) || !is_array($stage['parsed'])) {
+                throw new UnexpectedValueException('Der geprüfte CSV-Stand ist ungültig. Bitte prüfen Sie die Datei erneut.');
+            }
+            $parsed = $stage['parsed'];
+            $school_year_mode = isset($stage['school_year_mode']) ? (string) $stage['school_year_mode'] : 'preserve';
+            $target_school_year = isset($stage['target_school_year']) ? (string) $stage['target_school_year'] : flz_ags_default_school_year();
+            $school_year = isset($stage['school_year']) ? (string) $stage['school_year'] : flz_ags_current_school_year();
             $plan = null;
             FLZ_AGS_Model::transaction(
                 function () use ($parsed, &$plan): void {
@@ -2006,19 +2043,40 @@ class FLZ_AGS_Plugin
         $school_year = isset($_POST['school_year'])
             ? flz_ags_sanitize_school_year(sanitize_text_field(wp_unslash($_POST['school_year'])))
             : flz_ags_current_school_year();
-        if (!isset($_POST['confirm_registration_import'])) {
-            wp_die(esc_html__('Bitte bestätigen Sie, dass die CSV personenbezogene Anmeldungsdaten enthält.', 'flz-ags'));
+        $is_import = isset($_POST['submit_csv']);
+        $is_confirmation = isset($_POST['confirm_registration_csv_import']);
+        if (!$is_import && !$is_confirmation) {
+            wp_die(esc_html__('Ungültige CSV-Aktion.', 'flz-ags'));
         }
 
         try {
-            $this->assert_registration_csv_upload();
-            $parsed = FLZ_AGS_Registration_CSV::parse_tolerant(
-                flz_wpdb_objects_read_uploaded_csv(
-                    'registration-csv',
-                    'Einlesen des Anmeldungs-Backups',
-                    false
-                )
-            );
+            if ($is_import) {
+                $this->assert_registration_csv_upload();
+                $parsed = FLZ_AGS_Registration_CSV::parse_tolerant(
+                    flz_wpdb_objects_read_uploaded_csv(
+                        'registration-csv',
+                        'Einlesen des Anmeldungs-Backups',
+                        false
+                    )
+                );
+                $stage = array('parsed' => $parsed, 'school_year' => $school_year);
+                FlzCsvImportStage::store('flzags:registrations', get_current_user_id(), $stage, hash('sha256', serialize($stage)), 15 * MINUTE_IN_SECONDS);
+                flz_ags_safe_redirect(flz_ags_admin_url(array(
+                    'page' => 'flz-ags-registrations',
+                    'school_year' => $school_year,
+                    'csv_checked' => 1,
+                )));
+            }
+            $stored_stage = FlzCsvImportStage::consume('flzags:registrations', get_current_user_id());
+            if (!is_array($stored_stage) || !isset($stored_stage['rows'], $stored_stage['proof']) || !is_array($stored_stage['rows'])) {
+                throw new UnexpectedValueException('Der geprüfte CSV-Stand ist abgelaufen. Bitte prüfen Sie die Datei erneut.');
+            }
+            $stage = $stored_stage['rows'];
+            if (!hash_equals((string) $stored_stage['proof'], hash('sha256', serialize($stage))) || !isset($stage['parsed']) || !is_array($stage['parsed'])) {
+                throw new UnexpectedValueException('Der geprüfte CSV-Stand ist ungültig. Bitte prüfen Sie die Datei erneut.');
+            }
+            $parsed = $stage['parsed'];
+            $school_year = isset($stage['school_year']) ? (string) $stage['school_year'] : $school_year;
             $report = FLZ_AGS_Model::transaction(
                 fn(): array => $this->apply_registration_csv_import($parsed),
                 'Importieren von AG-Anmeldungen aus CSV'

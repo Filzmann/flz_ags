@@ -5,6 +5,9 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 
 ## Unreleased
 
+- AG-/Termin- sowie Anmeldungs-CSV werden erst geprüft und danach mit einer
+  separaten Bestätigung ohne erneute Dateiauswahl importiert.
+
 ## 0.7.4
 
 - AGs und Anmeldungen können wahlweise je Schuljahr oder Schulhalbjahr geführt werden; historische Jahresdaten bleiben erhalten.

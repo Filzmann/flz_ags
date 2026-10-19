@@ -89,10 +89,24 @@ natcasesort($category_options);
 					));
 					echo $ui->button_upload(array(
 						'label'   => 'AG-CSV hochladen',
-						'confirm' => 'CSV jetzt importieren? Brauchbare Datensätze werden sofort übernommen.',
+						'confirm' => 'CSV jetzt prüfen?',
 						'attrs'   => array('name' => 'submit_csv'),
 					));
 					echo $ui->form_end();
+					if ( $course_csv_stage_ready ) {
+						echo $ui->form_start(array(
+							'method' => 'post',
+							'action' => esc_url(admin_url('admin-post.php')),
+							'nonce' => 'flz_ags_import_courses_csv',
+							'hidden' => array('action' => 'flz_ags_import_courses_csv'),
+						));
+						echo $ui->button_upload(array(
+							'label' => 'Geprüfte AG-CSV jetzt importieren',
+							'confirm' => 'Die geprüfte AG-CSV jetzt importieren? Die Zwischenspeicherung wird danach gelöscht.',
+							'attrs' => array('name' => 'confirm_course_csv_import'),
+						));
+						echo $ui->form_end();
+					}
 					// phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
 					?>
 				</div>

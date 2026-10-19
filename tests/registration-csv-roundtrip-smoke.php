@@ -98,10 +98,13 @@ flz_ags_registration_csv_assert( false !== $handler_start && false !== $handler_
 $handler = substr( $plugin_source, $handler_start, $handler_end - $handler_start );
 flz_ags_registration_csv_assert( str_contains( $handler, '$this->assert_admin_permission();' ), 'Der Anmeldungs-Import prüft keine Berechtigung.' );
 flz_ags_registration_csv_assert( str_contains( $handler, "check_admin_referer('flz_ags_import_registrations_csv')" ), 'Der Anmeldungs-Import prüft keinen Nonce.' );
-flz_ags_registration_csv_assert( str_contains( $handler, "isset(\$_POST['confirm_registration_import'])" ), 'Der direkte Import verlangt keine ausdrückliche Bestätigung.' );
+flz_ags_registration_csv_assert( str_contains( $handler, "isset(\$_POST['confirm_registration_csv_import'])" ), 'Der Anmeldungsimport verlangt keine ausdrückliche Bestätigung.' );
+flz_ags_registration_csv_assert( str_contains( $handler, 'FlzCsvImportStage::store' ), 'Der Anmeldungsimport speichert den geprüften Stand nicht serverseitig.' );
+flz_ags_registration_csv_assert( str_contains( $handler, 'FlzCsvImportStage::consume' ), 'Der Anmeldungsimport verwendet den geprüften Stand nicht genau einmal.' );
 flz_ags_registration_csv_assert( ! str_contains( $handler, 'wp_mail(' ), 'Ein Backup-Import versendet unerwartet Bestätigungsmails.' );
 flz_ags_registration_csv_assert( str_contains( $handler, 'FLZ_AGS_Model::transaction(' ), 'Der Anmeldungs-Import ist nicht atomar abgesichert.' );
 flz_ags_registration_csv_assert( str_contains( $template_source, 'Anmeldungs-CSV hochladen' ), 'Die Anmeldungsseite bietet keinen Upload.' );
+flz_ags_registration_csv_assert( str_contains( $template_source, 'Geprüfte Anmeldungs-CSV jetzt importieren' ), 'Die Anmeldungsoberfläche bietet keine eindeutige Importbestätigung.' );
 flz_ags_registration_csv_assert( ! str_contains( $template_source, 'Dry-Run' ), 'Der Upload irritiert weiterhin mit einem Dry-Run.' );
 flz_ags_registration_csv_assert( str_contains( $template_source, 'Hinweise zum letzten Anmeldungs-Import' ), 'Der Importbericht besitzt keine klare Überschrift.' );
 

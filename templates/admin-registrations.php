@@ -77,7 +77,7 @@ echo $ui->csv_panel(array(
 
 <section class="flz-ui-panel flz-ui-csv-panel">
 	<h3 class="flz-ui-panel__title">Anmeldungs-CSV hochladen</h3>
-	<p class="flz-ui-panel__description">Stellt Anmeldungen aus einem zuvor heruntergeladenen Backup wieder her. AG und Termin werden über Schuljahr, AG-Slug, Wochentag, Uhrzeit und Raum zugeordnet. Nicht auflösbare Zeilen werden übersprungen und einzeln gemeldet; es werden keine Bestätigungsmails versendet.</p>
+	<p class="flz-ui-panel__description">Stellt Anmeldungen aus einem zuvor heruntergeladenen Backup wieder her. Die Datei wird zuerst geprüft und kann anschließend ohne erneute Auswahl importiert werden. AG und Termin werden beim Import gegen den aktuellen Bestand zugeordnet. Nicht auflösbare Zeilen werden übersprungen und einzeln gemeldet; es werden keine Bestätigungsmails versendet.</p>
 	<div class="flz-ui-csv-panel__actions">
 		<?php
 		// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped Formular, Nonce und Felder vollständig.
@@ -97,17 +97,26 @@ echo $ui->csv_panel(array(
 			'label'  => 'Anmeldungs-CSV-Datei',
 			'accept' => '.csv',
 		));
-		echo $ui->field(array(
-			'type'        => 'checkbox',
-			'name'        => 'confirm_registration_import',
-			'label'       => 'Ich bestätige, dass diese Datei personenbezogene Anmeldungsdaten enthält und wiederhergestellt werden soll.',
-			'description' => 'Vorhandene identische Backup-Datensätze werden aktualisiert. Andere aktive Anmeldungen derselben Schüler*in bleiben geschützt.',
-		));
 		echo $ui->button_upload(array(
-			'label'   => 'Anmeldungs-CSV hochladen',
-			'confirm' => 'Anmeldungsdaten jetzt direkt importieren?',
+			'label'   => 'Anmeldungs-CSV prüfen',
+			'confirm' => 'Anmeldungsdaten jetzt prüfen?',
+			'attrs' => array('name' => 'submit_csv'),
 		));
 		echo $ui->form_end();
+		if ( $registration_csv_stage_ready ) {
+			echo $ui->form_start(array(
+				'method' => 'post',
+				'action' => esc_url(admin_url('admin-post.php')),
+				'nonce' => 'flz_ags_import_registrations_csv',
+				'hidden' => array('action' => 'flz_ags_import_registrations_csv'),
+			));
+			echo $ui->button_upload(array(
+				'label' => 'Geprüfte Anmeldungs-CSV jetzt importieren',
+				'confirm' => 'Die geprüfte Anmeldungs-CSV jetzt importieren? Die Zwischenspeicherung wird danach gelöscht.',
+				'attrs' => array('name' => 'confirm_registration_csv_import'),
+			));
+			echo $ui->form_end();
+		}
 		// phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
 		?>
 	</div>
