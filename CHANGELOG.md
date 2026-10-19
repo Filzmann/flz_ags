@@ -5,6 +5,8 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 
 ## Unreleased
 
+## 0.7.5
+
 - AG-/Termin- sowie Anmeldungs-CSV werden erst geprüft und danach mit einer
   separaten Bestätigung ohne erneute Dateiauswahl importiert.
 
