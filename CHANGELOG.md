@@ -5,6 +5,12 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 
 ## Unreleased
 
+## 0.7.6
+
+- Der hervorgehobene Hinweis im öffentlichen AG-Anmeldeformular ist nun
+  vollständig über die Einstellungen bearbeitbar; ein mehrzeiliger
+  Standardtext wird bei leerer Einstellung wiederhergestellt.
+
 ## 0.7.5
 
 - AG-/Termin- sowie Anmeldungs-CSV werden erst geprüft und danach mit einer

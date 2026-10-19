@@ -133,9 +133,9 @@ $page_picker_row = static function (
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row"><label for="flz_ags_registration_form_notice">Zusätzlicher Hinweis im Anmeldeformular</label></th>
+						<th scope="row"><label for="flz_ags_registration_form_notice">Hinweis im Anmeldeformular</label></th>
                         <td>
-                            <?php echo $ui->field(array("type" => "textarea", "name" => "registration_form_notice", "id" => "flz_ags_registration_form_notice", "label" => "Zusätzlicher Hinweis im Anmeldeformular", "value" => flz_ags_registration_form_notice(), "rows" => 3, "description" => "Der verbindliche Halbjahres-Hinweis wird immer hervorgehoben oberhalb der Felder angezeigt. Dieser optionale Text ergänzt ihn.")); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+							<?php echo $ui->field(array("type" => "textarea", "name" => "registration_form_notice", "id" => "flz_ags_registration_form_notice", "label" => "Hinweis im Anmeldeformular", "value" => flz_ags_registration_form_notice(), "rows" => 6, "description" => "Dieser hervorgehobene Hinweis erscheint oberhalb der Formularfelder. Leer lassen stellt den Standardhinweis wieder her.")); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
                         </td>
                     </tr>
                 </tbody>

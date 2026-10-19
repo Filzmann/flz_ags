@@ -25,10 +25,10 @@ if (str_contains($frontend, "(!empty(\$slot->room) ? ' · ' . \$slot->room : '')
 foreach (array(
     'Ersttreffpunkt: Raum ' => $controller,
     'Weitere Raumänderungen organisieren die AG-Leitungen direkt mit den Schülerinnen und Schülern.' => $controller,
-    'function flz_ags_required_registration_notice(): string' => $helpers,
+    'function flz_ags_default_registration_form_notice(): string' => $helpers,
     'Die Anmeldung für diese AG gilt nur für ein Schulhalbjahr.' => $helpers,
     'Die nächste Anmeldemöglichkeit ist ab dem 31.01.2027 möglich.' => $helpers,
-    'flz_ags_required_registration_notice()' => $form,
+    'flz_ags_registration_form_notice()' => $form,
     'Deaktivierte AGs werden weder öffentlich angezeigt noch können sie über die Homepage angemeldet werden.' => $course_form,
     'Aktive, aber nicht sichtbare AGs werden weder öffentlich angezeigt noch können sie über die Homepage angemeldet werden.' => $course_form,
     'Die AG bleibt sichtbar, aber die Online-Anmeldung ist geschlossen. Interessierte Schüler*innen können sich direkt an die AG-Leitung wenden.' => $course_form,
