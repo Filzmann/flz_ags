@@ -39,6 +39,9 @@ if ( ! str_contains( $css, '@media (min-width: 960px)' ) || ! str_contains( $css
 if ( ! str_contains( $css, 'grid-template-columns: minmax(0, 1fr)' ) ) {
 	throw new RuntimeException( 'Die mobile einspaltige Darstellung der Einstellungen ist nicht abgesichert.' );
 }
+if ( ! str_contains( $settings, 'wp_editor(' ) ) {
+	throw new RuntimeException( 'Der frei konfigurierbare AG-Anmeldehinweis verwendet keinen WordPress-Editor.' );
+}
 
 $privacy_start = strpos( $settings, 'flz-ags-settings-card--privacy' );
 $privacy_end   = false === $privacy_start ? false : strpos( $settings, '</section>', $privacy_start );

@@ -135,7 +135,21 @@ $page_picker_row = static function (
                     <tr>
 						<th scope="row"><label for="flz_ags_registration_form_notice">Hinweis im Anmeldeformular</label></th>
                         <td>
-							<?php echo $ui->field(array("type" => "textarea", "name" => "registration_form_notice", "id" => "flz_ags_registration_form_notice", "label" => "Hinweis im Anmeldeformular", "value" => flz_ags_registration_form_notice(), "rows" => 6, "description" => "Dieser hervorgehobene Hinweis erscheint oberhalb der Formularfelder. Leer lassen stellt den Standardhinweis wieder her.")); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?>
+							<?php
+							wp_editor(
+								flz_ags_registration_form_notice(),
+								'flz_ags_registration_form_notice',
+								array(
+									'textarea_name' => 'registration_form_notice',
+									'textarea_rows' => 6,
+									'media_buttons' => false,
+									'teeny' => true,
+									'tinymce' => array( 'toolbar1' => 'bold,italic,bullist,numlist,link,unlink' ),
+									'quicktags' => true,
+								)
+							);
+							?>
+							<p class="description">Dieser hervorgehobene Hinweis erscheint oberhalb der Formularfelder. Leer lassen stellt den Standardhinweis wieder her.</p>
                         </td>
                     </tr>
                 </tbody>

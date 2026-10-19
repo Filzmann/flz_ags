@@ -5,6 +5,11 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 
 ## Unreleased
 
+## 0.7.7
+
+- Der AG-Anmeldehinweis und die ausführliche AG-Beschreibung werden im
+  Backend mit dem kompakten WordPress-Editor bearbeitet.
+
 ## 0.7.6
 
 - Der hervorgehobene Hinweis im öffentlichen AG-Anmeldeformular ist nun

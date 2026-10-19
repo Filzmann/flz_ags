@@ -150,9 +150,27 @@ if (empty($slot_rows)) {
 			$admin_image_row('Vorschaubild', 'image_url', $course->image_url ?? '');
 			$admin_detail_page_row($course);
 			$admin_textarea_row('Kurzbeschreibung', 'short_description', $course->short_description ?? '', 3);
-			$admin_textarea_row('Beschreibung', 'description', $course->description ?? '', 6);
 			$admin_text_row('Erlaubte Jahrgänge', 'allowed_grades', $course->allowed_grades ?? '', 'Leer = alle; erlaubt: 7,8,9,10,11,12. Einzelklassen wie 7.1 werden automatisch auf den Jahrgang 7 reduziert.');
 			?>
+			<tr>
+				<th scope="row"><label for="flz_ags_course_description">Beschreibung</label></th>
+				<td>
+					<?php
+					wp_editor(
+						(string) ( $course->description ?? '' ),
+						'flz_ags_course_description',
+						array(
+							'textarea_name' => 'description',
+							'textarea_rows' => 8,
+							'media_buttons' => false,
+							'teeny' => true,
+							'tinymce' => array( 'toolbar1' => 'bold,italic,bullist,numlist,link,unlink' ),
+							'quicktags' => true,
+						)
+					);
+					?>
+				</td>
+			</tr>
 			<tr>
 				<th scope="row">Regeln/Status</th>
 				<td>

@@ -34,7 +34,7 @@ foreach (array(
     'registration_form_notice' => $settings,
     'multiple_registrations_enabled' => $settings,
     'registration_form_notice' => $form,
-    'wp_kses_post( $registration_form_notice )' => $form,
+    'wp_kses_post( wpautop( $registration_form_notice ) )' => $form,
     'z-index: 2001' => $css,
     '.flz-ags-registration-panel.is-open,' => $css,
     '.flz-ags-registration-panel:target {' => $css,
