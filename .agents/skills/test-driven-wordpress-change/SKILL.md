@@ -11,6 +11,7 @@ Before editing production code, record:
 
 - the domain or security invariant;
 - observable target behavior and relevant negative/edge cases;
+- the defect or regression the test must detect;
 - the smallest honest test level;
 - what the test proves and does not prove;
 - required WordPress/DDEV integration or manual UI evidence.
@@ -27,9 +28,11 @@ to automated structural tests.
 2. Include a meaningful denied, invalid, manipulated or failure case for each
    affected protection boundary and assert absence of forbidden side effects.
 3. Run the focused test before production changes.
-4. Confirm it fails for the expected product reason, not syntax, fixture,
-   bootstrap or environment failure. An immediately green test is only a
-   labelled characterization test, not Red evidence.
+4. Record command, exit code and expected assertion difference. Confirm it
+   fails for the expected product reason, not syntax, fixture, bootstrap,
+   environment failure or a mock-only assertion when behavior is observable.
+   An immediately green test is only a labelled characterization test, not Red
+   evidence.
 
 ## Green
 
@@ -44,6 +47,14 @@ to automated structural tests.
 Refactor only under green tests. Re-run security negatives, syntax/static
 checks, `scripts/check-fast`, and the required DDEV/browser path. If an
 environment check cannot run, name the gap rather than weakening the test.
+
+For capability, nonce, REST/AJAX or object-scope changes, prove authorized
+success, rejected requests without data changes, and manipulated identifiers.
+For schema or migration changes, prove fresh installation, relevant upgrade,
+retry safety and preservation of meaningful existing states. Shared contracts
+require affected provider/consumer checks plus compatibility or a documented
+breaking-change path.
+
 
 ## Allowed deviations
 
