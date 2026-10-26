@@ -108,12 +108,15 @@ echo $ui->csv_panel(array(
 				'method' => 'post',
 				'action' => esc_url(admin_url('admin-post.php')),
 				'nonce' => 'flz_ags_import_registrations_csv',
-				'hidden' => array('action' => 'flz_ags_import_registrations_csv'),
+				'hidden' => array(
+					'action'                            => 'flz_ags_import_registrations_csv',
+					'confirm_registration_csv_import' => '1',
+				),
 			));
-			echo $ui->button_upload(array(
+			echo $ui->button_save(array(
 				'label' => 'Geprüfte Anmeldungs-CSV jetzt importieren',
 				'confirm' => 'Die geprüfte Anmeldungs-CSV jetzt importieren? Die Zwischenspeicherung wird danach gelöscht.',
-				'attrs' => array('name' => 'confirm_registration_csv_import'),
+				'hide_label' => false,
 			));
 			echo $ui->form_end();
 		}

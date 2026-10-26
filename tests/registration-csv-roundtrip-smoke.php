@@ -105,6 +105,10 @@ flz_ags_registration_csv_assert( ! str_contains( $handler, 'wp_mail(' ), 'Ein Ba
 flz_ags_registration_csv_assert( str_contains( $handler, 'FLZ_AGS_Model::transaction(' ), 'Der Anmeldungs-Import ist nicht atomar abgesichert.' );
 flz_ags_registration_csv_assert( str_contains( $template_source, 'Anmeldungs-CSV hochladen' ), 'Die Anmeldungsseite bietet keinen Upload.' );
 flz_ags_registration_csv_assert( str_contains( $template_source, 'Geprüfte Anmeldungs-CSV jetzt importieren' ), 'Die Anmeldungsoberfläche bietet keine eindeutige Importbestätigung.' );
+flz_ags_registration_csv_assert( str_contains( $template_source, "'confirm_registration_csv_import' => '1'" ), 'Die Anmeldungsimportbestätigung übermittelt keine serverseitige Bestätigung.' );
+flz_ags_registration_csv_assert( str_contains( $template_source, "echo \$ui->button_save(array(" ), 'Die Anmeldungsimportbestätigung nutzt keinen verlässlichen Submit-Button.' );
+flz_ags_registration_csv_assert( str_contains( $plugin_source, 'registration_csv_dry_run_report_key' ), 'Der Anmeldungs-Dry-Run speichert keinen verständlichen Prüfbericht.' );
+flz_ags_registration_csv_assert( str_contains( $plugin_source, 'Anmeldungs-CSV geprüft:' ), 'Der Anmeldungs-Dry-Run zeigt keine Zusammenfassung.' );
 flz_ags_registration_csv_assert( ! str_contains( $template_source, 'Dry-Run' ), 'Der Upload irritiert weiterhin mit einem Dry-Run.' );
 flz_ags_registration_csv_assert( str_contains( $template_source, 'Hinweise zum letzten Anmeldungs-Import' ), 'Der Importbericht besitzt keine klare Überschrift.' );
 

@@ -247,6 +247,10 @@ flz_ags_csv_assert( str_contains( $import_source, 'FLZ_AGS_Course_CSV::parse_tol
 flz_ags_csv_assert( str_contains( $import_source, 'FLZ_AGS_Course_CSV::parse_slot_csv(' ), 'Der AG-CSV-Import erkennt keine getrennte Termin-Datei.' );
 flz_ags_csv_assert( str_contains( $import_source, "\$school_year_mode = isset(\$_POST['school_year_mode'])" ), 'Der Import wertet die Wahl des Schuljahrmodus nicht aus.' );
 flz_ags_csv_assert( str_contains( $template_source, 'Geprüfte AG-CSV jetzt importieren' ), 'Die AG-Oberfläche bietet keine eindeutige Importbestätigung.' );
+flz_ags_csv_assert( str_contains( $template_source, "'confirm_course_csv_import' => '1'" ), 'Die AG-Importbestätigung übermittelt keine serverseitige Bestätigung.' );
+flz_ags_csv_assert( str_contains( $template_source, "echo \$ui->button_save(array(" ), 'Die AG-Importbestätigung nutzt keinen verlässlichen Submit-Button.' );
+flz_ags_csv_assert( str_contains( $plugin_source, 'course_csv_dry_run_report_key' ), 'Der AG-Dry-Run speichert keinen verständlichen Änderungsbericht.' );
+flz_ags_csv_assert( str_contains( $plugin_source, 'AG-CSV geprüft:' ), 'Der AG-Dry-Run zeigt keine Zusammenfassung geplanter Änderungen.' );
 flz_ags_csv_assert( str_contains( $import_source, 'FLZ_AGS_Course_CSV::remap_school_year(' ), 'Der Import überträgt CSV-Daten nicht in das ausgewählte Zielschuljahr.' );
 flz_ags_csv_assert( str_contains( $import_source, "'school_year' => 'replace' === \$school_year_mode ? \$target_school_year : \$school_year" ), 'Nach einer Schuljahrübertragung zeigt die AG-Liste nicht das Zielschuljahr.' );
 flz_ags_csv_assert( str_contains( $import_source, '$this->assert_course_csv_upload();' ), 'Fehlende oder abgebrochene CSV-Uploads erhalten keine gezielte Prüfung.' );

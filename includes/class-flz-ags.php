@@ -382,7 +382,20 @@ class FLZ_AGS_Plugin
             delete_transient($this->course_csv_report_key());
         }
         if (isset($_GET['csv_checked']) && FlzCsvImportStage::exists('flzags:courses', get_current_user_id())) {
-            echo wp_kses_post(flz_ags_notice('Die AG-CSV wurde geprüft. Bitte bestätigen Sie jetzt den Import; eine erneute Dateiauswahl ist nicht nötig.', 'success'));
+            $dry_run_report = get_transient($this->course_csv_dry_run_report_key());
+            if (is_array($dry_run_report)) {
+                echo wp_kses_post(flz_ags_notice(sprintf(
+                    'AG-CSV geprüft: %d AGs neu, %d AGs aktualisiert, %d Termine neu, %d Termine aktualisiert und %d Hinweise. Bitte bestätigen Sie jetzt den Import; eine erneute Dateiauswahl ist nicht nötig.',
+                    (int) ($dry_run_report['courses_created'] ?? 0),
+                    (int) ($dry_run_report['courses_updated'] ?? 0),
+                    (int) ($dry_run_report['slots_created'] ?? 0),
+                    (int) ($dry_run_report['slots_updated'] ?? 0),
+                    count((array) ($dry_run_report['warnings'] ?? array()))
+                ), empty($dry_run_report['warnings']) ? 'success' : 'warning'));
+                delete_transient($this->course_csv_dry_run_report_key());
+            } else {
+                echo wp_kses_post(flz_ags_notice('Die AG-CSV wurde geprüft. Bitte bestätigen Sie jetzt den Import; eine erneute Dateiauswahl ist nicht nötig.', 'success'));
+            }
         }
         if (isset($_GET['flz_ags_error'])) {
             $error_code = sanitize_key(wp_unslash($_GET['flz_ags_error']));
@@ -1486,7 +1499,17 @@ class FLZ_AGS_Plugin
             echo wp_kses_post(flz_ags_notice(flz_ags_error_message($error_code), 'error'));
         }
         if (isset($_GET['csv_checked']) && $this->is_manager() && FlzCsvImportStage::exists('flzags:registrations', get_current_user_id())) {
-            echo wp_kses_post(flz_ags_notice('Die Anmeldungs-CSV wurde geprüft. Bitte bestätigen Sie jetzt den Import; eine erneute Dateiauswahl ist nicht nötig.', 'success'));
+            $dry_run_report = get_transient($this->registration_csv_dry_run_report_key());
+            if (is_array($dry_run_report)) {
+                echo wp_kses_post(flz_ags_notice(sprintf(
+                    'Anmeldungs-CSV geprüft: %d Datensätze sind verarbeitbar, %d Hinweise wurden gefunden. Bitte bestätigen Sie jetzt den Import; eine erneute Dateiauswahl ist nicht nötig.',
+                    (int) ($dry_run_report['valid'] ?? 0),
+                    count((array) ($dry_run_report['warnings'] ?? array()))
+                ), empty($dry_run_report['warnings']) ? 'success' : 'warning'));
+                delete_transient($this->registration_csv_dry_run_report_key());
+            } else {
+                echo wp_kses_post(flz_ags_notice('Die Anmeldungs-CSV wurde geprüft. Bitte bestätigen Sie jetzt den Import; eine erneute Dateiauswahl ist nicht nötig.', 'success'));
+            }
         }
         if ($load_failed) {
             echo wp_kses_post(
@@ -1707,6 +1730,13 @@ class FLZ_AGS_Plugin
                     $parsed = FLZ_AGS_Course_CSV::remap_school_year($parsed, $target_school_year);
                 }
                 $plan = $this->build_course_csv_import_plan($parsed['courses'], $parsed['warnings']);
+                set_transient($this->course_csv_dry_run_report_key(), array(
+                    'courses_created' => (int) $plan['courses_created'],
+                    'courses_updated' => (int) $plan['courses_updated'],
+                    'slots_created' => (int) $plan['slots_created'],
+                    'slots_updated' => (int) $plan['slots_updated'],
+                    'warnings' => array_values(array_map('strval', (array) $plan['warnings'])),
+                ), 15 * MINUTE_IN_SECONDS);
                 $stage = array(
                     'parsed' => $parsed,
                     'school_year_mode' => $school_year_mode,
@@ -1983,6 +2013,11 @@ class FLZ_AGS_Plugin
         return 'flz_ags_course_csv_report_' . get_current_user_id();
     }
 
+    private function course_csv_dry_run_report_key(): string
+    {
+        return 'flz_ags_course_csv_dry_run_' . get_current_user_id();
+    }
+
     public function handle_delete_old_registrations(): void
     {
         $this->assert_admin_permission();
@@ -2060,6 +2095,10 @@ class FLZ_AGS_Plugin
                     )
                 );
                 $stage = array('parsed' => $parsed, 'school_year' => $school_year);
+                set_transient($this->registration_csv_dry_run_report_key(), array(
+                    'valid' => count((array) $parsed['registrations']),
+                    'warnings' => array_values(array_map('strval', (array) $parsed['warnings'])),
+                ), 15 * MINUTE_IN_SECONDS);
                 FlzCsvImportStage::store('flzags:registrations', get_current_user_id(), $stage, hash('sha256', serialize($stage)), 15 * MINUTE_IN_SECONDS);
                 flz_ags_safe_redirect(flz_ags_admin_url(array(
                     'page' => 'flz-ags-registrations',
@@ -2227,6 +2266,11 @@ class FLZ_AGS_Plugin
     private function registration_csv_report_key(): string
     {
         return 'flz_ags_registration_csv_report_' . get_current_user_id();
+    }
+
+    private function registration_csv_dry_run_report_key(): string
+    {
+        return 'flz_ags_registration_csv_dry_run_' . get_current_user_id();
     }
 
     public function handle_export_csv(): void

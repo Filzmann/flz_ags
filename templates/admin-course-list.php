@@ -98,12 +98,15 @@ natcasesort($category_options);
 							'method' => 'post',
 							'action' => esc_url(admin_url('admin-post.php')),
 							'nonce' => 'flz_ags_import_courses_csv',
-							'hidden' => array('action' => 'flz_ags_import_courses_csv'),
+							'hidden' => array(
+								'action'                     => 'flz_ags_import_courses_csv',
+								'confirm_course_csv_import' => '1',
+							),
 						));
-						echo $ui->button_upload(array(
+						echo $ui->button_save(array(
 							'label' => 'Geprüfte AG-CSV jetzt importieren',
 							'confirm' => 'Die geprüfte AG-CSV jetzt importieren? Die Zwischenspeicherung wird danach gelöscht.',
-							'attrs' => array('name' => 'confirm_course_csv_import'),
+							'hide_label' => false,
 						));
 						echo $ui->form_end();
 					}
