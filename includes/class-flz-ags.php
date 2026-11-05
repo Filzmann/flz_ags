@@ -40,6 +40,8 @@ class FLZ_AGS_Plugin
         add_action('admin_post_flz_ags_quick_edit_course', array($this, 'handle_quick_edit_course'));
         add_action('admin_post_flz_ags_save_settings', array($this, 'handle_save_settings'));
         add_action('admin_post_flz_ags_update_registration', array($this, 'handle_update_registration'));
+        add_action('admin_post_flz_ags_confirm_registration', array($this, 'handle_confirm_registration'));
+        add_action('admin_post_flz_ags_bulk_registration', array($this, 'handle_bulk_registration'));
         add_action('admin_post_flz_ags_export_csv', array($this, 'handle_export_csv'));
         add_action('admin_post_flz_ags_import_registrations_csv', array($this, 'handle_import_registrations_csv'));
         add_action('admin_post_flz_ags_delete_old_registrations', array($this, 'handle_delete_old_registrations'));
@@ -55,10 +57,12 @@ class FLZ_AGS_Plugin
         add_shortcode('flz_ag_anmeldung', array($this, 'shortcode_registration'));
 
         add_action('init', array($this, 'register_blocks'));
+        add_action('init', array($this, 'handle_registration_activation'));
         add_filter('the_content', array($this, 'append_registration_to_detail_page'));
         add_action('wp_enqueue_scripts', array($this, 'register_frontend_assets'));
         add_action('admin_enqueue_scripts', array($this, 'register_admin_assets'));
         add_action('flz_ags_daily_registration_cleanup', array($this, 'handle_scheduled_registration_cleanup'));
+        add_action('flz_ags_hourly_unconfirmed_registration_release', array($this, 'handle_scheduled_unconfirmed_registration_release'));
     }
 
     public function register_blocks(): void
@@ -795,6 +799,9 @@ class FLZ_AGS_Plugin
             'parent_hint' => $parent_hint,
             'registration_retention_enabled' => (bool) get_option('flz_ags_registration_retention_enabled', 0),
             'registration_retention_months' => flz_ags_registration_retention_months(),
+            'unconfirmed_registration_release_enabled' => (bool) get_option('flz_ags_unconfirmed_registration_release_enabled', 0),
+            'unconfirmed_registration_release_hours' => flz_ags_unconfirmed_registration_release_hours(),
+            'unconfirmed_registration_warning_hours' => flz_ags_unconfirmed_registration_warning_hours(),
             'mock_mail_capture_exists' => false !== get_transient('flz_ags_mock_confirmation_mail_last'),
         ));
         echo '</div>';
@@ -817,6 +824,9 @@ class FLZ_AGS_Plugin
         $retention_months = isset($_POST['registration_retention_months'])
             ? max(1, min(120, absint(wp_unslash($_POST['registration_retention_months']))))
             : 24;
+        $unconfirmed_release_enabled = isset($_POST['unconfirmed_registration_release_enabled']) ? 1 : 0;
+        $unconfirmed_release_hours = isset($_POST['unconfirmed_registration_release_hours']) ? max(1, min(720, absint(wp_unslash($_POST['unconfirmed_registration_release_hours'])))) : 48;
+        $unconfirmed_warning_hours = isset($_POST['unconfirmed_registration_warning_hours']) ? max(0, min($unconfirmed_release_hours - 1, absint(wp_unslash($_POST['unconfirmed_registration_warning_hours'])))) : 24;
         $multiple_registrations_enabled = isset($_POST['multiple_registrations_enabled']) ? 1 : 0;
         $grade_7_exclusive_start = isset($_POST['registration_grade_7_exclusive_start'])
             ? sanitize_text_field(wp_unslash($_POST['registration_grade_7_exclusive_start']))
@@ -835,11 +845,15 @@ class FLZ_AGS_Plugin
             }
 
             $retention_enabled ? flz_ags_schedule_registration_cleanup() : flz_ags_unschedule_registration_cleanup();
+            $unconfirmed_release_enabled ? flz_ags_schedule_unconfirmed_registration_release() : flz_ags_unschedule_unconfirmed_registration_release();
             update_option('flz_ags_current_school_year', $school_year, false);
             update_option('flz_ags_classes', !empty($classes) ? $classes : flz_ags_default_classes(), false);
             update_option('flz_ags_parent_page_id', $parent_page_id, false);
             update_option('flz_ags_registration_retention_months', $retention_months, false);
             update_option('flz_ags_registration_retention_enabled', $retention_enabled, false);
+            update_option('flz_ags_unconfirmed_registration_release_enabled', $unconfirmed_release_enabled, false);
+            update_option('flz_ags_unconfirmed_registration_release_hours', $unconfirmed_release_hours, false);
+            update_option('flz_ags_unconfirmed_registration_warning_hours', $unconfirmed_warning_hours, false);
             update_option('flz_ags_multiple_registrations_enabled', $multiple_registrations_enabled, false);
             update_option('flz_ags_period_mode', $period_mode, false);
             update_option('flz_ags_registration_grade_7_exclusive_start', $grade_7_exclusive_start, false);
@@ -962,7 +976,12 @@ class FLZ_AGS_Plugin
 
     private function count_active_registrations(int $slot_id): int
     {
-        return FLZ_AGS_Registration::count_by(array('slot_id' => $slot_id, 'status' => 'active'));
+        return $this->count_reserved_registrations($slot_id);
+    }
+
+    private function count_reserved_registrations(int $slot_id): int
+    {
+        return FLZ_AGS_Registration::count_reserved_for_slot($slot_id);
     }
 
     /**
@@ -1144,11 +1163,18 @@ class FLZ_AGS_Plugin
             . '–'
             . flz_ags_format_time($slot->end_time);
 
-        $subject = 'AG-Anmeldung bestätigt: ' . (string) $slot->title;
+        $activation_url = add_query_arg(array(
+            'flz_ags_activate' => '1',
+            'token' => rawurlencode((string) $registration->activation_token),
+        ), home_url('/'));
+        $subject = 'Bitte AG-Anmeldung bestätigen: ' . (string) $slot->title;
         $message = implode("\n", array_filter(array(
             'Hallo,',
             '',
-            'die AG-Anmeldung wurde gespeichert.',
+            'die AG-Anmeldung wurde vorgemerkt. Bitte bestätigen Sie sie über diesen Link:',
+            $activation_url,
+            '',
+            'Ohne Bestätigung wird der reservierte Platz nach Ablauf der eingestellten Frist wieder freigegeben.',
             '',
             'Schüler*in: ' . (string) $registration->student_first_name . ' ' . (string) $registration->student_last_name,
             'Klasse: ' . flz_ags_class_label((string) $registration->class_name),
@@ -1203,6 +1229,83 @@ class FLZ_AGS_Plugin
             }
 
             throw new RuntimeException('wp_mail() meldete einen Fehler beim Senden der AG-Bestätigungsmail.');
+        }
+    }
+
+    /** Öffentlicher Token-Endpunkt: Der Token ist die alleinige Berechtigung für die Aktivierung. */
+    public function handle_registration_activation(): void
+    {
+        if (!isset($_GET['flz_ags_activate'], $_GET['token']) || '1' !== sanitize_text_field(wp_unslash($_GET['flz_ags_activate']))) {
+            return;
+        }
+        $token = sanitize_text_field(wp_unslash($_GET['token']));
+        if ($token === '') {
+            wp_die(esc_html__('Der Bestätigungslink ist ungültig.', 'flz-ags'));
+        }
+
+        try {
+            $activated = FLZ_AGS_Model::transaction(function () use ($token): bool {
+                $registration = FLZ_AGS_Registration::find_by_activation_token($token);
+                if (!$registration instanceof FLZ_AGS_Registration || !empty($registration->is_confirmed) || !hash_equals((string) $registration->activation_token, $token)) {
+                    return false;
+                }
+                $expires = strtotime((string) $registration->activation_expires_at);
+                if (false === $expires || $expires < time()) {
+                    return false;
+                }
+                $registration->is_confirmed = 1;
+                $registration->activation_token = null;
+                $registration->activation_expires_at = null;
+                $registration->activation_warning_sent_at = null;
+                $registration->updated_at = current_time('mysql');
+                $registration->save();
+                return true;
+            }, 'Aktivieren einer AG-Anmeldung');
+        } catch (Throwable $error) {
+            flz_ags_log_error($error, 'Aktivieren einer AG-Anmeldung');
+            $activated = false;
+        }
+
+        wp_die(esc_html__($activated ? 'Die AG-Anmeldung wurde bestätigt.' : 'Dieser Bestätigungslink ist ungültig oder abgelaufen.', 'flz-ags'));
+    }
+
+    public function handle_scheduled_unconfirmed_registration_release(): void
+    {
+        if (!(bool) get_option('flz_ags_unconfirmed_registration_release_enabled', 0)) {
+            return;
+        }
+        $now = current_datetime()->format('Y-m-d H:i:s');
+        $warning_start = current_datetime()->modify('+' . flz_ags_unconfirmed_registration_warning_hours() . ' hours')->format('Y-m-d H:i:s');
+        try {
+            foreach (FLZ_AGS_Registration::find_pending_expiring_between($now, $warning_start) as $registration) {
+                $registration->activation_warning_sent_at = $now;
+                $registration->updated_at = $now;
+                $registration->save();
+                $this->send_unconfirmed_registration_lifecycle_email($registration, 'warning');
+            }
+            foreach (FLZ_AGS_Registration::find_pending_expired($now) as $registration) {
+                $recipient = (string) $registration->student_email;
+                $registration->delete();
+                $this->send_unconfirmed_registration_lifecycle_email($registration, 'released', $recipient);
+            }
+        } catch (Throwable $error) {
+            flz_ags_log_error($error, 'Automatische Freigabe vorgemerkter AG-Anmeldungen');
+        }
+    }
+
+    private function send_unconfirmed_registration_lifecycle_email(FLZ_AGS_Registration $registration, string $kind, string $recipient = ''): void
+    {
+        $recipient = $recipient !== '' ? $recipient : (string) $registration->student_email;
+        if (!is_email($recipient)) {
+            return;
+        }
+        $warning = 'warning' === $kind;
+        $subject = $warning ? 'Erinnerung: AG-Anmeldung bestätigen' : 'AG-Anmeldung wurde freigegeben';
+        $message = $warning
+            ? 'Bitte bestätigen Sie die vorgemerkte AG-Anmeldung mit dem bereits zugesandten Link. Andernfalls wird der Platz wieder freigegeben.'
+            : 'Die vorgemerkte AG-Anmeldung ist abgelaufen. Der reservierte Platz wurde wieder freigegeben.';
+        if (!wp_mail($recipient, $subject, $message, array('Content-Type: text/plain; charset=UTF-8'))) {
+            throw new RuntimeException('Die Benachrichtigung zur AG-Freigabe konnte nicht versendet werden.');
         }
     }
 
@@ -1376,6 +1479,9 @@ class FLZ_AGS_Plugin
                         'student_first_name' => $first_name,
                         'student_last_name' => $last_name,
                         'status' => 'active',
+                        'is_confirmed' => 0,
+                        'activation_token' => wp_generate_password(64, false, false),
+                        'activation_expires_at' => current_datetime()->modify('+' . flz_ags_unconfirmed_registration_release_hours() . ' hours')->format('Y-m-d H:i:s'),
                     );
                     if (flz_ags_multiple_registrations_enabled()) {
                         $duplicate_criteria['course_id'] = (int) $slot->course_id;
@@ -1417,7 +1523,7 @@ class FLZ_AGS_Plugin
 
                     return array(
                         'success' => true,
-                        'messages' => array('Die AG-Anmeldung wurde gespeichert. Eine Bestätigung wurde per E-Mail versendet.'),
+                        'messages' => array('Die AG-Anmeldung wurde vorgemerkt. Bitte bestätigen Sie sie über den Link in der E-Mail.'),
                         'registration' => $registration,
                         'slot' => $slot,
                     );
@@ -1634,6 +1740,64 @@ class FLZ_AGS_Plugin
             );
         }
 
+        flz_ags_safe_redirect(flz_ags_admin_url(array('page' => 'flz-ags-registrations', 'updated' => 1)));
+    }
+
+    public function handle_confirm_registration(): void
+    {
+        $this->assert_admin_permission();
+        check_admin_referer('flz_ags_confirm_registration');
+        $registration_id = isset($_POST['registration_id']) ? absint(wp_unslash($_POST['registration_id'])) : 0;
+        if ($registration_id <= 0) {
+            wp_die(esc_html__('Ungültige Anfrage.', 'flz-ags'));
+        }
+        try {
+            FLZ_AGS_Model::transaction(function () use ($registration_id): void {
+                $registration = FLZ_AGS_Registration::get_by_id($registration_id);
+                if (!$registration instanceof FLZ_AGS_Registration || 'active' !== $registration->status || !empty($registration->is_confirmed)) {
+                    throw new UnexpectedValueException('Die zu bestätigende Anmeldung wurde nicht gefunden.');
+                }
+                $registration->is_confirmed = 1;
+                $registration->activation_token = null;
+                $registration->activation_expires_at = null;
+                $registration->activation_warning_sent_at = null;
+                $registration->updated_at = current_time('mysql');
+                $registration->save();
+            }, 'Manuelles Bestätigen einer AG-Anmeldung');
+        } catch (Throwable $error) {
+            $this->redirect_admin_error($error, 'Manuelles Bestätigen einer AG-Anmeldung', 'confirm-registration', array('page' => 'flz-ags-registrations'));
+        }
+        flz_ags_safe_redirect(flz_ags_admin_url(array('page' => 'flz-ags-registrations', 'updated' => 1)));
+    }
+
+    public function handle_bulk_registration(): void
+    {
+        $this->assert_admin_permission();
+        check_admin_referer('flz_ags_bulk_registration');
+        $action = isset($_POST['registration_bulk_action']) ? sanitize_key(wp_unslash($_POST['registration_bulk_action'])) : '';
+        $ids = isset($_POST['registration_bulk_ids']) && is_array($_POST['registration_bulk_ids']) ? array_unique(array_map('absint', wp_unslash($_POST['registration_bulk_ids']))) : array();
+        try {
+            FLZ_AGS_Model::transaction(function () use ($action, $ids): void {
+                foreach (array_filter($ids) as $registration_id) {
+                    $registration = FLZ_AGS_Registration::get_by_id($registration_id);
+                    if (!$registration instanceof FLZ_AGS_Registration || !empty($registration->is_confirmed)) {
+                        continue;
+                    }
+                    if ('confirm' === $action) {
+                        $registration->is_confirmed = 1;
+                        $registration->activation_token = null;
+                        $registration->activation_expires_at = null;
+                        $registration->activation_warning_sent_at = null;
+                        $registration->updated_at = current_time('mysql');
+                        $registration->save();
+                    } elseif ('delete' === $action) {
+                        $registration->delete();
+                    }
+                }
+            }, 'Sammelaktion für AG-Vormerkungen');
+        } catch (Throwable $error) {
+            $this->redirect_admin_error($error, 'Sammelaktion für AG-Vormerkungen', 'bulk-registration', array('page' => 'flz-ags-registrations'));
+        }
         flz_ags_safe_redirect(flz_ags_admin_url(array('page' => 'flz-ags-registrations', 'updated' => 1)));
     }
 

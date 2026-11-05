@@ -46,6 +46,10 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
     public ?string $updated_at;
     public ?string $student_key;
     public ?string $active_student_key;
+    public ?int $is_confirmed;
+    public ?string $activation_token;
+    public ?string $activation_expires_at;
+    public ?string $activation_warning_sent_at;
 
     // Optionale Anzeige- und Exportfelder aus den JOIN-Abfragen.
     public ?string $title;
@@ -74,6 +78,10 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
         $this->updated_at = $data['updated_at'] ?? null;
         $this->student_key = $data['student_key'] ?? null;
         $this->active_student_key = $data['active_student_key'] ?? null;
+        $this->is_confirmed = isset($data['is_confirmed']) ? (int) $data['is_confirmed'] : 1;
+        $this->activation_token = $data['activation_token'] ?? null;
+        $this->activation_expires_at = $data['activation_expires_at'] ?? null;
+        $this->activation_warning_sent_at = $data['activation_warning_sent_at'] ?? null;
         $this->title = $data['title'] ?? null;
         $this->slug = $data['slug'] ?? null;
         $this->weekday = isset($data['weekday']) ? (int) $data['weekday'] : null;
@@ -169,6 +177,35 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
         return static::query_models($sql, array($cutoff), 'Laden abgelaufener AG-Anmeldungen');
     }
 
+    public static function count_reserved_for_slot(int $slot_id): int
+    {
+        global $wpdb;
+        $sql = 'SELECT COUNT(*) FROM ' . static::table_name() . " WHERE slot_id = %d AND status = 'active'";
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Der Wert wird unmittelbar über prepare() gebunden.
+        return (int) $wpdb->get_var($wpdb->prepare($sql, $slot_id));
+    }
+
+    /** @return array<int,self> */
+    public static function find_pending_expiring_between(string $start, string $end): array
+    {
+        $sql = 'SELECT * FROM ' . static::table_name() . " WHERE status = 'active' AND is_confirmed = 0 AND activation_warning_sent_at IS NULL AND activation_expires_at > %s AND activation_expires_at <= %s ORDER BY id ASC";
+        return static::query_models($sql, array($start, $end), 'Laden bevorstehend freizugebender AG-Anmeldungen');
+    }
+
+    /** @return array<int,self> */
+    public static function find_pending_expired(string $now): array
+    {
+        $sql = 'SELECT * FROM ' . static::table_name() . " WHERE status = 'active' AND is_confirmed = 0 AND activation_expires_at <= %s ORDER BY id ASC";
+        return static::query_models($sql, array($now), 'Laden freizugebender AG-Anmeldungen');
+    }
+
+    public static function find_by_activation_token(string $token): ?self
+    {
+        $sql = 'SELECT * FROM ' . static::table_name() . ' WHERE activation_token = %s LIMIT 1';
+        $models = static::query_models($sql, array($token), 'Laden einer AG-Anmeldung zur Bestätigung');
+        return $models[0] ?? null;
+    }
+
     protected static function get_table_schema(): string
     {
         return "(
@@ -189,6 +226,10 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
             updated_at datetime NOT NULL,
             student_key char(64) NOT NULL,
             active_student_key char(64) NULL,
+            is_confirmed tinyint(1) NOT NULL DEFAULT 1,
+            activation_token varchar(128) NULL,
+            activation_expires_at datetime NULL,
+            activation_warning_sent_at datetime NULL,
             PRIMARY KEY  (id),
             KEY slot_id (slot_id),
             KEY course_id (course_id),
@@ -241,6 +282,10 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
             'updated_at' => $this->updated_at,
             'student_key' => $this->student_key,
             'active_student_key' => $this->active_student_key,
+            'is_confirmed' => $this->is_confirmed,
+            'activation_token' => $this->activation_token,
+            'activation_expires_at' => $this->activation_expires_at,
+            'activation_warning_sent_at' => $this->activation_warning_sent_at,
         );
     }
 

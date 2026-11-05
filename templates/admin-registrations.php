@@ -143,9 +143,16 @@ echo $ui->csv_panel(array(
 
 <div data-flz-ags-registration-list>
 <p class="screen-reader-text" aria-live="polite" data-flz-ags-registration-results-status></p>
+<?php echo $ui->form_start(array('method' => 'post', 'action' => esc_url(admin_url('admin-post.php')), 'nonce' => 'flz_ags_bulk_registration', 'hidden' => array('action' => 'flz_ags_bulk_registration'), 'attrs' => array('id' => 'flz-ags-registration-bulk-form'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formular. ?>
+	<p>
+		<?php echo $ui->button_save(array('label' => 'Markierte Vormerkungen bestätigen', 'type' => 'submit', 'hide_label' => false, 'confirm' => 'Alle markierten Vormerkungen jetzt bestätigen?', 'attrs' => array('name' => 'registration_bulk_action', 'value' => 'confirm'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped den Button. ?>
+		<?php echo $ui->button_delete(array('label' => 'Markierte Vormerkungen freigeben', 'type' => 'submit', 'hide_label' => false, 'confirm' => 'Alle markierten Vormerkungen löschen und Plätze freigeben?', 'attrs' => array('name' => 'registration_bulk_action', 'value' => 'delete'))); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped den Button. ?>
+	</p>
+<?php echo $ui->form_end(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped das Formular. ?>
 <table class="widefat striped">
 	<thead>
 		<tr>
+			<th scope="col">Markieren</th>
 			<th scope="col" aria-sort="none">
 				<button type="button" class="flz-ags-admin-sort-button" data-flz-ags-registration-sort="student">Schüler*in</button>
 				<details class="flz-ags-admin-column-filter"><summary>Filtern</summary>
@@ -213,6 +220,21 @@ echo $ui->csv_panel(array(
 			$email = (string) $registration->student_email;
 			$status_key = (string) $registration->status;
 			$status_label = flz_ags_status_label($status_key);
+			$selection = empty($registration->is_confirmed)
+				? '<input type="checkbox" name="registration_bulk_ids[]" value="' . esc_attr((string) $registration->id) . '" form="flz-ags-registration-bulk-form" aria-label="Vormerkung markieren" />'
+				: '';
+			$confirmation_action = '';
+			if ( empty( $registration->is_confirmed ) && 'active' === $status_key ) {
+				$confirmation_action = $ui->action_form_button(array(
+					'preset' => 'save',
+					'label' => 'Telefonisch bestätigen',
+					'button' => array('type' => 'submit', 'icon' => '', 'hide_label' => false, 'confirm' => 'Diese Anmeldung jetzt bestätigen?'),
+					'method' => 'post',
+					'action' => esc_url(admin_url('admin-post.php')),
+					'nonce' => 'flz_ags_confirm_registration',
+					'hidden' => array('action' => 'flz_ags_confirm_registration', 'registration_id' => absint($registration->id)),
+				));
+			}
 			$date_value = substr((string) $registration->created_at, 0, 10);
 			$action_key = 'editable';
 			$current_course_id = (int) $registration->course_id;
@@ -258,6 +280,7 @@ echo $ui->csv_panel(array(
 					),
 				),
 				'cells' => array(
+					array('view_html' => $selection),
 					array('view' => $student_label, 'field' => array('type' => 'text', 'name' => 'student_last_name', 'label' => 'Nachname', 'value' => (string) $registration->student_last_name, 'required' => true)),
 					array('view' => $class_label, 'field' => array('type' => 'text', 'name' => 'class_name', 'label' => 'Klasse', 'value' => (string) $registration->class_name, 'required' => true)),
 					array('view' => $course_label, 'field' => array('type' => 'select', 'name' => 'course_id', 'label' => 'AG', 'value' => $current_course_id, 'options' => $row_course_edit_options, 'attrs' => array('data-flz-ags-registration-course' => true))),
@@ -268,6 +291,7 @@ echo $ui->csv_panel(array(
 				),
 				'edit' => array('label' => 'Anmeldung bearbeiten'),
 				'save' => array('label' => 'Anmeldung speichern'),
+				'extra_actions' => $confirmation_action,
 				'details' => array(
 					'label' => 'Weitere Angaben',
 					'fields' => array(

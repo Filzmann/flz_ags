@@ -539,7 +539,7 @@ function flz_ags_weekday_label($weekday): string
 function flz_ags_status_labels(): array
 {
     return array(
-        'active' => 'aktiv',
+		'active' => 'aktiv',
         'withdrawn' => 'widerrufen',
         'cancelled' => 'abgesagt',
         'waitlist' => 'Warteliste',
@@ -555,6 +555,16 @@ function flz_ags_status_label(string $status): string
 function flz_ags_registration_retention_months(): int
 {
     return max(1, min(120, absint(get_option('flz_ags_registration_retention_months', 24))));
+}
+
+function flz_ags_unconfirmed_registration_release_hours(): int
+{
+    return max(1, min(720, absint(get_option('flz_ags_unconfirmed_registration_release_hours', 48))));
+}
+
+function flz_ags_unconfirmed_registration_warning_hours(): int
+{
+    return max(0, min(flz_ags_unconfirmed_registration_release_hours() - 1, absint(get_option('flz_ags_unconfirmed_registration_warning_hours', 24))));
 }
 
 /**

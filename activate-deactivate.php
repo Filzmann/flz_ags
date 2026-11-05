@@ -31,11 +31,17 @@ function flz_ags_activate(): void
     add_option('flz_ags_parent_page_id', flz_ags_detect_detail_parent_page_id());
     add_option('flz_ags_registration_retention_enabled', 0);
     add_option('flz_ags_registration_retention_months', 24);
+    add_option('flz_ags_unconfirmed_registration_release_enabled', 0);
+    add_option('flz_ags_unconfirmed_registration_release_hours', 48);
+    add_option('flz_ags_unconfirmed_registration_warning_hours', 24);
     add_option('flz_ags_period_mode', 'school_year');
     add_option('flz_ags_registration_grade_7_exclusive_start', '');
     add_option('flz_ags_registration_grade_7_exclusive_days', 7);
     if ((bool) get_option('flz_ags_registration_retention_enabled', 0)) {
         flz_ags_schedule_registration_cleanup();
+    }
+    if ((bool) get_option('flz_ags_unconfirmed_registration_release_enabled', 0)) {
+        flz_ags_schedule_unconfirmed_registration_release();
     }
 }
 
@@ -77,6 +83,9 @@ function flz_ags_maybe_upgrade(): void
 
     add_option('flz_ags_registration_retention_enabled', 0);
     add_option('flz_ags_registration_retention_months', 24);
+    add_option('flz_ags_unconfirmed_registration_release_enabled', 0);
+    add_option('flz_ags_unconfirmed_registration_release_hours', 48);
+    add_option('flz_ags_unconfirmed_registration_warning_hours', 24);
     add_option('flz_ags_multiple_registrations_enabled', 0);
     add_option('flz_ags_registration_form_notice', '');
     flz_ags_create_leader_role();
@@ -86,6 +95,9 @@ function flz_ags_maybe_upgrade(): void
     add_option('flz_ags_registration_grade_7_exclusive_days', 7);
     if ((bool) get_option('flz_ags_registration_retention_enabled', 0)) {
         flz_ags_schedule_registration_cleanup();
+    }
+    if ((bool) get_option('flz_ags_unconfirmed_registration_release_enabled', 0)) {
+        flz_ags_schedule_unconfirmed_registration_release();
     }
 
     // Frühere lokale Fallback-Mails enthielten Formularwerte dauerhaft.
@@ -261,11 +273,30 @@ function flz_ags_unschedule_registration_cleanup(): void
     }
 }
 
+function flz_ags_schedule_unconfirmed_registration_release(): void
+{
+    if (!wp_next_scheduled('flz_ags_hourly_unconfirmed_registration_release')) {
+        $scheduled = wp_schedule_event(time() + HOUR_IN_SECONDS, 'hourly', 'flz_ags_hourly_unconfirmed_registration_release', array(), true);
+        if (is_wp_error($scheduled) || false === $scheduled) {
+            throw new RuntimeException('Der stündliche Freigabetermin konnte nicht eingerichtet werden.');
+        }
+    }
+}
+
+function flz_ags_unschedule_unconfirmed_registration_release(): void
+{
+    $cleared = wp_clear_scheduled_hook('flz_ags_hourly_unconfirmed_registration_release', array(), true);
+    if (is_wp_error($cleared) || false === $cleared) {
+        throw new RuntimeException('Der stündliche Freigabetermin konnte nicht entfernt werden.');
+    }
+}
+
 /** Deaktivierung beendet nur den Cron-Termin und löscht keine Fachdaten. */
 function flz_ags_deactivate(): void
 {
     try {
         flz_ags_unschedule_registration_cleanup();
+        flz_ags_unschedule_unconfirmed_registration_release();
     } catch (Throwable $error) {
         if (class_exists('flz_wpdb_objects\\FlzWpdbObjectsException')) {
             flz_ags_log_error($error, 'Entfernen des AG-Löschtermins bei Deaktivierung');

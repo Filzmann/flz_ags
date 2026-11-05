@@ -176,6 +176,14 @@ $page_picker_row = static function (
                 </tbody>
             </table>
 
+            <h3>Vorgemerkte Anmeldungen</h3>
+            <p class="description">Neue AG-Anmeldungen werden per E-Mail bestätigt. Die automatische Freigabe ist standardmäßig ausgeschaltet.</p>
+            <table class="form-table" role="presentation"><tbody>
+                <tr><th scope="row">Automatische Freigabe</th><td><?php echo $ui->field(array('type' => 'checkbox', 'name' => 'unconfirmed_registration_release_enabled', 'label' => 'Vorgemerkte Anmeldungen automatisch freigeben', 'checked' => $unconfirmed_registration_release_enabled)); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?></td></tr>
+                <tr><th scope="row"><label for="flz_ags_unconfirmed_registration_release_hours">Freigabefrist</label></th><td><?php echo $ui->input('number', array('name' => 'unconfirmed_registration_release_hours', 'id' => 'flz_ags_unconfirmed_registration_release_hours', 'label' => 'Stunden bis zur Freigabe', 'value' => $unconfirmed_registration_release_hours, 'min' => 1, 'max' => 720)); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?></td></tr>
+                <tr><th scope="row"><label for="flz_ags_unconfirmed_registration_warning_hours">Warnung vor der Freigabe</label></th><td><?php echo $ui->input('number', array('name' => 'unconfirmed_registration_warning_hours', 'id' => 'flz_ags_unconfirmed_registration_warning_hours', 'label' => 'Stunden vor Ablauf', 'value' => $unconfirmed_registration_warning_hours, 'min' => 0, 'max' => 719)); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped die Komponente. ?></td></tr>
+            </tbody></table>
+
             <h3>Alte Anmeldungen jetzt löschen</h3>
             <p>Entfernt dauerhaft alle Anmeldungen, deren Anmeldedatum länger als <?php echo esc_html((string) $registration_retention_months); ?> Monate zurückliegt. Erstellen Sie bei Bedarf vorher auf der Seite „Anmeldungen“ ein CSV-Backup.</p>
             <?php
