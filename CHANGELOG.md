@@ -5,6 +5,14 @@ Ein Datum wird erst bei einer tatsächlichen Veröffentlichung ergänzt.
 
 ## Unreleased
 
+## 0.7.8
+
+- AG-Anmeldungen werden per Link bestätigt; vorgemerkte Plätze bleiben bis
+  zur Bestätigung reserviert und können optional nach Warnung automatisch
+  freigegeben werden.
+- Das Backend erlaubt das einzelne oder markierte Bestätigen und Freigeben
+  vorgemerkter Anmeldungen.
+
 ## 0.7.7
 
 - Der AG-Anmeldehinweis und die ausführliche AG-Beschreibung werden im
