@@ -1,5 +1,7 @@
 <?php
 
+function wp_generate_uuid4(): string { return '550e8400-e29b-41d4-a716-446655440000'; }
+
 if ( PHP_SAPI !== 'cli' ) {
 	http_response_code( 404 );
 	exit;

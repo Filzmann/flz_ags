@@ -88,7 +88,11 @@ Ein sauberer Commit wird reproduzierbar paketiert mit:
   beziehungsweise Slots enthalten sein sollen. Der Import erkennt beide
   Varianten automatisch.
 - Der Import aktualisiert oder ergänzt Datensätze über portable fachliche
-  Schlüssel; nicht aufgeführte AGs und Termine bleiben erhalten.
+  Schlüssel; nicht aufgeführte AGs und Termine bleiben erhalten. Neue Exporte
+  enthalten eine dauerhafte `Datensatz-ID` (UUID) für jede AG, jeden Termin
+  und jede Anmeldung. Diese ID bleibt beim erneuten Import erhalten und wird
+  vorrangig zur Zuordnung verwendet. Ältere Dateien ohne ID bleiben lesbar;
+  doppelte oder widersprüchliche IDs werden abgewiesen.
 - Beim Import können die Schuljahre der CSV beibehalten oder alle enthaltenen
   AGs samt Slots einem ausgewählten Zielschuljahr zugeordnet werden. Kollidiert
   dabei derselbe Slug aus mehreren Quelljahren, gewinnt das neueste Quelljahr

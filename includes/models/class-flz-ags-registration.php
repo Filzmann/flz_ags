@@ -30,6 +30,7 @@ function flz_ags_registration_student_key(
  */
 class FLZ_AGS_Registration extends FLZ_AGS_Model
 {
+    public ?string $record_uuid;
     public ?int $course_id;
     public ?int $slot_id;
     public ?string $school_year;
@@ -62,6 +63,7 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
     public function __construct(array $data = array())
     {
         parent::__construct($data['id'] ?? null);
+        $this->record_uuid = $data['record_uuid'] ?? null;
         $this->course_id = isset($data['course_id']) ? (int) $data['course_id'] : null;
         $this->slot_id = isset($data['slot_id']) ? (int) $data['slot_id'] : null;
         $this->school_year = $data['school_year'] ?? null;
@@ -230,6 +232,8 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
             activation_token varchar(128) NULL,
             activation_expires_at datetime NULL,
             activation_warning_sent_at datetime NULL,
+            record_uuid char(36) NULL,
+            UNIQUE KEY record_uuid (record_uuid),
             PRIMARY KEY  (id),
             KEY slot_id (slot_id),
             KEY course_id (course_id),
@@ -242,6 +246,7 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
 
     protected function prepareDataForSaving(): array
     {
+        $this->record_uuid ??= wp_generate_uuid4();
         if (
             $this->course_id === null || $this->course_id <= 0
             || $this->slot_id === null || $this->slot_id <= 0
@@ -266,6 +271,7 @@ class FLZ_AGS_Registration extends FLZ_AGS_Model
         $this->active_student_key = 'active' === $this->status ? $this->student_key : null;
 
         return array(
+            'record_uuid' => $this->record_uuid,
             'course_id' => $this->course_id,
             'slot_id' => $this->slot_id,
             'school_year' => $this->school_year,

@@ -22,7 +22,7 @@ final class FLZ_AGS_Registration_CSV
     public static function header(): array
     {
         return array(
-            'Zeitraum', 'Status', 'Klasse', 'Jahrgang', 'Nachname', 'Vorname', 'E-Mail', 'Datenschutz bestätigt', 'AG', 'Wochentag', 'Beginn', 'Ende', 'Raum', 'Abgemeldet am', 'Abmeldegrund', 'Angemeldet am', 'Zuletzt geändert',
+            'Zeitraum', 'Status', 'Klasse', 'Jahrgang', 'Nachname', 'Vorname', 'E-Mail', 'Datenschutz bestätigt', 'AG', 'Wochentag', 'Beginn', 'Ende', 'Raum', 'Abgemeldet am', 'Abmeldegrund', 'Angemeldet am', 'Zuletzt geändert', 'Datensatz-ID',
         );
     }
 
@@ -55,6 +55,7 @@ final class FLZ_AGS_Registration_CSV
                 (string) ($registration->withdrawn_reason ?? ''),
                 (string) ($registration->created_at ?? ''),
                 (string) ($registration->updated_at ?? ''),
+                (string) ($registration->record_uuid ?? ''),
             );
         }
         return $rows;
@@ -73,9 +74,12 @@ final class FLZ_AGS_Registration_CSV
             throw new UnexpectedValueException('Die Anmeldungs-CSV ist leer.');
         }
         $header = array_map(array(self::class, 'decode_cell'), array_shift($raw_rows));
-        if ($header === self::header()) {
-            $raw_rows = array_map(static function ($row): array {
+        $has_uuid = $header === self::header();
+        $uuids = array();
+        if ($has_uuid || $header === array_slice(self::header(), 0, -1)) {
+            $raw_rows = array_map(static function ($row) use ($has_uuid, &$uuids): array {
                 $row = array_pad(array_map('strval', is_array($row) ? $row : array()), 17, '');
+                $uuids[] = $has_uuid ? strtolower(trim((string) ($row[17] ?? ''))) : '';
                 $slug = trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($row[8])), '-');
                 return array(self::VERSION, $row[0], $row[1], $row[2], $row[3], $row[4], $row[5], $row[6], $row[7], $slug, $row[8], $row[9], $row[10], $row[11], $row[12], $row[13], $row[14], $row[15], $row[16]);
             }, $raw_rows);
@@ -88,6 +92,13 @@ final class FLZ_AGS_Registration_CSV
         $column_count = count(self::legacy_header());
         foreach ($raw_rows as $index => $raw_row) {
             $line = $index + 2;
+            $uuid = $uuids[$index] ?? '';
+            if ($has_uuid && !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $uuid)) {
+                throw new UnexpectedValueException('Zeile ' . $line . ': Die Datensatz-ID ist ungültig.');
+            }
+            if ($has_uuid && count(array_keys($uuids, $uuid, true)) > 1) {
+                throw new UnexpectedValueException('Zeile ' . $line . ': Die Datensatz-ID kommt mehrfach vor.');
+            }
             if (!is_array($raw_row)) {
                 $warnings[] = 'Zeile ' . $line . ' wurde übersprungen: kein lesbarer CSV-Datensatz.';
                 continue;
@@ -167,6 +178,7 @@ final class FLZ_AGS_Registration_CSV
             }
 
             $registrations[] = array(
+                'record_uuid' => $uuid,
                 'source_line' => $line,
                 'school_year' => $row[1],
                 'status' => $status,

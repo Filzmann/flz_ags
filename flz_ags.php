@@ -13,7 +13,7 @@
 defined('ABSPATH') || exit;
 
 define('FLZ_AGS_VERSION', '0.7.8');
-define('FLZ_AGS_DB_VERSION', '2.3.0');
+define('FLZ_AGS_DB_VERSION', '2.4.0');
 define('FLZ_AGS_FILE', __FILE__);
 define('FLZ_AGS_DIR', plugin_dir_path(__FILE__));
 define('FLZ_AGS_URL', plugins_url('flz_ags/'));

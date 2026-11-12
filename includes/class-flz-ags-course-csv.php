@@ -15,7 +15,7 @@ final class FLZ_AGS_Course_CSV
     /** @return array<int,string> */
     private static function legacy_header(): array
     {
-        return array('format_version', 'record_type', 'course_key', 'school_year', 'title', 'slug', 'short_description', 'description', 'image_url', 'detail_page_path', 'category', 'leader_name', 'allowed_grades', 'only_grade_7', 'is_active', 'is_visible', 'registration_open', 'course_sort_order', 'slot_weekday', 'slot_start_time', 'slot_end_time', 'slot_room', 'slot_max_participants', 'slot_is_active', 'slot_sort_order');
+        return array('format_version', 'record_type', 'course_key', 'school_year', 'title', 'slug', 'short_description', 'description', 'image_url', 'detail_page_path', 'category', 'leader_name', 'allowed_grades', 'only_grade_7', 'is_active', 'is_visible', 'registration_open', 'course_sort_order', 'slot_weekday', 'slot_start_time', 'slot_end_time', 'slot_room', 'slot_max_participants', 'slot_is_active', 'slot_sort_order', 'record_uuid');
     }
 
     /**
@@ -30,20 +30,20 @@ final class FLZ_AGS_Course_CSV
     public static function course_header(): array
     {
         return array(
-            'Zeitraum', 'AG', 'Kurzbeschreibung', 'Beschreibung', 'Bild-URL', 'Detailseite', 'Kategorie', 'AG-Leitung', 'Jahrgänge', 'Nur Klasse 7', 'Aktiv', 'Sichtbar', 'Anmeldung offen', 'Sortierung',
+            'Zeitraum', 'AG', 'Kurzbeschreibung', 'Beschreibung', 'Bild-URL', 'Detailseite', 'Kategorie', 'AG-Leitung', 'Jahrgänge', 'Nur Klasse 7', 'Aktiv', 'Sichtbar', 'Anmeldung offen', 'Sortierung', 'Datensatz-ID',
         );
     }
 
     /** @return array<int,string> */
     public static function slot_header(): array
     {
-        return array('Zeitraum', 'AG', 'Wochentag', 'Beginn', 'Ende', 'Raum', 'Maximale Teilnehmende', 'Aktiv', 'Sortierung');
+        return array('Zeitraum', 'AG', 'Wochentag', 'Beginn', 'Ende', 'Raum', 'Maximale Teilnehmende', 'Aktiv', 'Sortierung', 'Datensatz-ID');
     }
 
     /** @return array<int,string> */
     private static function combined_header(): array
     {
-        return array_merge(self::course_header(), array('Wochentag', 'Beginn', 'Ende', 'Raum', 'Maximale Teilnehmende', 'Termin aktiv', 'Termin-Sortierung'));
+        return array_merge(array_slice(self::course_header(), 0, -1), array('Wochentag', 'Beginn', 'Ende', 'Raum', 'Maximale Teilnehmende', 'Termin aktiv', 'Termin-Sortierung', 'Datensatz-ID'));
     }
 
     public static function course_key(string $school_year, string $slug): string
@@ -82,7 +82,7 @@ final class FLZ_AGS_Course_CSV
                 (int) ($course->is_active ?? 0),
                 (int) ($course->is_visible ?? 0),
                 (int) ($course->registration_open ?? 0),
-                (int) ($course->sort_order ?? 0), '', '', '', '', '', '', '',
+                (int) ($course->sort_order ?? 0), '', '', '', '', '', '', '', (string) ($course->record_uuid ?? ''),
             );
 
             $slots = $slots_for_course((int) $course->id);
@@ -105,6 +105,7 @@ final class FLZ_AGS_Course_CSV
                     (int) ($slot->max_participants ?? 0),
                     (int) ($slot->is_active ?? 0),
                     (int) ($slot->sort_order ?? 0),
+                    (string) ($slot->record_uuid ?? ''),
                 );
             }
         }
@@ -116,7 +117,7 @@ final class FLZ_AGS_Course_CSV
     public static function export_course_rows(array $courses, ?callable $detail_page_path = null): array
     {
         $rows = self::export_rows($courses, static fn(int $course_id): array => array(), $detail_page_path);
-        return array_map(static fn(array $row): array => array_slice($row, 0, count(self::course_header())), $rows);
+        return array_map(static fn(array $row): array => array_merge(array_slice($row, 0, 14), array($row[21])), $rows);
     }
 
     /** @param array<int,object> $courses @return array<int,array<int,string|int>> */
@@ -125,7 +126,7 @@ final class FLZ_AGS_Course_CSV
         $rows = array();
         foreach ($courses as $course) {
             foreach ($slots_for_course((int) $course->id) as $slot) {
-                $rows[] = array((string) $course->school_year, (string) $course->title, (int) $slot->weekday, (string) $slot->start_time, (string) $slot->end_time, (string) $slot->room, (int) $slot->max_participants, (int) $slot->is_active, (int) $slot->sort_order);
+                $rows[] = array((string) $course->school_year, (string) $course->title, (int) $slot->weekday, (string) $slot->start_time, (string) $slot->end_time, (string) $slot->room, (int) $slot->max_participants, (int) $slot->is_active, (int) $slot->sort_order, (string) ($slot->record_uuid ?? ''));
             }
         }
         return $rows;
@@ -134,7 +135,7 @@ final class FLZ_AGS_Course_CSV
     /** @param array<int,array<int,string|null>> $raw_rows */
     public static function is_slot_csv(array $raw_rows): bool
     {
-        return !empty($raw_rows) && array_map(array(self::class, 'decode_cell'), (array) $raw_rows[0]) === self::slot_header();
+        return !empty($raw_rows) && in_array(array_map(array(self::class, 'decode_cell'), (array) $raw_rows[0]), array(self::slot_header(), array_slice(self::slot_header(), 0, -1)), true);
     }
 
     /** @param array<int,array<int,string|null>> $raw_rows @return array<string,array{school_year:string,title:string,slots:array<int,array<string,mixed>>}> */
@@ -143,12 +144,14 @@ final class FLZ_AGS_Course_CSV
         if (!self::is_slot_csv($raw_rows)) {
             throw new UnexpectedValueException('Die Termin-CSV-Kopfzeile entspricht nicht dem erwarteten Format.');
         }
+        $has_uuid = array_map(array(self::class, 'decode_cell'), (array) $raw_rows[0]) === self::slot_header();
         array_shift($raw_rows);
         $result = array();
+        $uuids = array();
         foreach ($raw_rows as $index => $raw_row) {
             $line = $index + 2;
             $row = array_map(array(self::class, 'decode_cell'), is_array($raw_row) ? $raw_row : array());
-            if (count($row) !== count(self::slot_header())) {
+            if (count($row) !== count(self::slot_header()) - ($has_uuid ? 0 : 1)) {
                 throw new UnexpectedValueException('CSV-Zeile ' . $line . ' besitzt nicht die erwartete Spaltenzahl.');
             }
             $school_year = self::school_year($row[0], $line);
@@ -170,7 +173,13 @@ final class FLZ_AGS_Course_CSV
             }
             $result[$key] ??= array('school_year' => $school_year, 'title' => $title, 'slots' => array(), 'slot_keys' => array());
             $result[$key]['slot_keys'][$slot_key] = true;
-            $result[$key]['slots'][] = array('weekday' => $weekday, 'start_time' => $start, 'end_time' => $end, 'room' => sanitize_text_field($row[5]), 'max_participants' => self::nonnegative_integer($row[6], $line, 'Maximale Teilnehmende'), 'is_active' => self::boolean($row[7], $line, 'Aktiv'), 'sort_order' => self::integer($row[8], $line, 'Sortierung'));
+            $slot_data = array('weekday' => $weekday, 'start_time' => $start, 'end_time' => $end, 'room' => sanitize_text_field($row[5]), 'max_participants' => self::nonnegative_integer($row[6], $line, 'Maximale Teilnehmende'), 'is_active' => self::boolean($row[7], $line, 'Aktiv'), 'sort_order' => self::integer($row[8], $line, 'Sortierung'));
+            if ($has_uuid) {
+                $slot_data['record_uuid'] = self::uuid($row[9], $line);
+                if (isset($uuids[$slot_data['record_uuid']])) { throw new UnexpectedValueException('CSV-Zeile ' . $line . ' enthält eine Datensatz-ID mehrfach.'); }
+                $uuids[$slot_data['record_uuid']] = true;
+            }
+            $result[$key]['slots'][] = $slot_data;
         }
         foreach ($result as &$item) { unset($item['slot_keys']); }
         unset($item);
@@ -399,6 +408,7 @@ final class FLZ_AGS_Course_CSV
                     ),
                     'slots' => array(),
                 );
+                if ('' !== $row[25]) { $courses[$key]['course']['record_uuid'] = self::uuid($row[25], $line_number); }
                 continue;
             }
 
@@ -429,6 +439,7 @@ final class FLZ_AGS_Course_CSV
                 'is_active'       => self::boolean($row[23], $line_number, 'slot_is_active'),
                 'sort_order'      => self::integer($row[24], $line_number, 'slot_sort_order'),
             );
+            if ('' !== $row[25]) { $pending_slots[$key][$slot_key]['record_uuid'] = self::uuid($row[25], $line_number); }
         }
 
         if (empty($courses)) {
@@ -452,13 +463,24 @@ final class FLZ_AGS_Course_CSV
             return $raw_rows;
         }
         $header = array_map(array(self::class, 'decode_cell'), (array) $raw_rows[0]);
-        if ($header !== self::course_header() && $header !== self::combined_header()) {
+        if ($header === array_slice(self::legacy_header(), 0, -1)) {
+            return array_merge(array(self::legacy_header()), array_map(static fn($row): array => array_merge((array) $row, array('')), array_slice($raw_rows, 1)));
+        }
+        $has_uuid = $header === self::course_header() || $header === self::combined_header();
+        $course_only = $header === self::course_header() || $header === array_slice(self::course_header(), 0, -1);
+        $combined_old = array_slice(self::combined_header(), 0, -1);
+        if (!$has_uuid && !$course_only && $header !== $combined_old) {
             return $raw_rows;
         }
 
         $normalized = array(self::legacy_header());
-        foreach (array_slice($raw_rows, 1) as $raw_row) {
+        $uuids = array();
+        foreach (array_slice($raw_rows, 1) as $index => $raw_row) {
             $row = array_pad(array_map(array(self::class, 'decode_cell'), is_array($raw_row) ? $raw_row : array()), 21, '');
+            $uuid = $has_uuid ? self::uuid($row[$course_only ? 14 : 21] ?? '', $index + 2) : '';
+            if ('' !== $uuid && isset($uuids[$uuid])) { throw new UnexpectedValueException('CSV-Zeile ' . ($index + 2) . ' enthält eine Datensatz-ID mehrfach.'); }
+            $uuids[$uuid] = true;
+            if ($course_only) { $row[14] = ''; }
             $slug = sanitize_title($row[1]);
             $record_type = '' === $row[14] ? 'course' : 'slot';
             $key = self::course_key($row[0], $slug);
@@ -466,10 +488,17 @@ final class FLZ_AGS_Course_CSV
                 self::VERSION, $record_type, $key, $row[0], $row[1], $slug,
                 $row[2], $row[3], $row[4], $row[5], $row[6], $row[7], $row[8], $row[9],
                 $row[10], $row[11], $row[12], $row[13], $row[14], $row[15], $row[16], $row[17],
-                $row[18], $row[19], $row[20],
+                $row[18], $row[19], $row[20], $uuid,
             );
         }
         return $normalized;
+    }
+
+    private static function uuid(string $value, int $line): string
+    {
+        $value = strtolower(trim($value));
+        if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $value)) { throw new UnexpectedValueException('CSV-Zeile ' . $line . ': Die Datensatz-ID ist ungültig.'); }
+        return $value;
     }
 
     private static function decode_cell($value): string

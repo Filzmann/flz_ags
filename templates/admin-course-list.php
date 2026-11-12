@@ -29,8 +29,8 @@ natcasesort($category_options);
 			<section class="flz-ui-panel flz-ui-csv-panel">
 				<h3 class="flz-ui-panel__title">AGs und Termine als CSV</h3>
 				<p class="flz-ui-panel__description">AG-Stammdaten und Termine werden getrennt heruntergeladen, damit beide Dateien übersichtlich in Excel bearbeitet werden können. Bestehende kombinierte Sicherungsdateien bleiben beim Import lesbar.</p>
-				<p class="flz-ui-csv-panel__format"><strong>AG-Format:</strong> <code>Zeitraum; AG; Kurzbeschreibung; Beschreibung; Bild-URL; Detailseite; Kategorie; AG-Leitung; Jahrgänge; Nur Klasse 7; Aktiv; Sichtbar; Anmeldung offen; Sortierung</code></p>
-				<p class="flz-ui-csv-panel__format-description"><strong>Zeitraum</strong>: Schuljahr (z. B. 2026/2027). <strong>AG</strong>: Titel der Arbeitsgemeinschaft. Schalterspalten verwenden 1 für Ja und 0 für Nein. Die separate Termin-Datei enthält Zeitraum, AG, Wochentag, Beginn, Ende, Raum, maximale Teilnehmende, Aktiv und Sortierung.</p>
+				<p class="flz-ui-csv-panel__format"><strong>AG-Format:</strong> <code>Zeitraum; AG; Kurzbeschreibung; Beschreibung; Bild-URL; Detailseite; Kategorie; AG-Leitung; Jahrgänge; Nur Klasse 7; Aktiv; Sichtbar; Anmeldung offen; Sortierung; Datensatz-ID</code></p>
+				<p class="flz-ui-csv-panel__format-description"><strong>Zeitraum</strong>: Schuljahr (z. B. 2026/2027). <strong>AG</strong>: Titel der Arbeitsgemeinschaft. <strong>Datensatz-ID</strong>: dauerhafte Kennung, bitte unverändert lassen. Schalterspalten verwenden 1 für Ja und 0 für Nein. Die separate Termin-Datei enthält Zeitraum, AG, Wochentag, Beginn, Ende, Raum, maximale Teilnehmende, Aktiv, Sortierung und Datensatz-ID.</p>
 				<div class="flz-ui-csv-panel__actions">
 					<?php
 					// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Renderer escaped Formulare, Nonces und Felder vollständig.

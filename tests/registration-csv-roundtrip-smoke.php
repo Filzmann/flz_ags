@@ -23,6 +23,7 @@ function flz_ags_registration_csv_assert( bool $condition, string $message ): vo
 }
 
 $registration = (object) array(
+	'record_uuid'       => '550e8400-e29b-41d4-a716-446655440000',
 	'school_year'       => '2026/2027',
 	'status'            => 'withdrawn',
 	'class_name'        => '8.2',
@@ -54,6 +55,15 @@ $parsed = FLZ_AGS_Registration_CSV::parse_tolerant(
 
 flz_ags_registration_csv_assert( count( $parsed['registrations'] ) === 1, 'Der Anmeldungs-CSV-Roundtrip verliert den Datensatz.' );
 $restored = $parsed['registrations'][0];
+flz_ags_registration_csv_assert( $restored['record_uuid'] === $registration->record_uuid, 'Die portable Datensatz-ID geht verloren.' );
+$old_rows = array( array_slice($header, 0, -1), array_slice($rows[0], 0, -1) );
+flz_ags_registration_csv_assert( '' === FLZ_AGS_Registration_CSV::parse_tolerant($old_rows)['registrations'][0]['record_uuid'], 'Das bisherige CSV-Format wird nicht gelesen.' );
+try {
+	FLZ_AGS_Registration_CSV::parse_tolerant(array($header, $rows[0], $rows[0]));
+	throw new RuntimeException('Eine doppelte Datensatz-ID wurde akzeptiert.');
+} catch (UnexpectedValueException $error) {
+	flz_ags_registration_csv_assert(str_contains($error->getMessage(), 'Datensatz-ID'), 'Doppelte IDs liefern keine verständliche Fehlermeldung.');
+}
 flz_ags_registration_csv_assert( $restored['course_slug'] === 'schach-ag', 'Der portable AG-Schlüssel geht verloren.' );
 flz_ags_registration_csv_assert( $restored['status'] === 'withdrawn', 'Der fachliche Status geht verloren.' );
 flz_ags_registration_csv_assert( $restored['consent_privacy'] === 1, 'Die dokumentierte Einwilligung geht verloren.' );

@@ -9,6 +9,7 @@ use flz_wpdb_objects\FlzWpdbObjectsException;
  */
 class FLZ_AGS_Slot extends FLZ_AGS_Model
 {
+    public ?string $record_uuid;
     public ?int $course_id;
     public ?string $school_year;
     public ?int $weekday;
@@ -38,6 +39,7 @@ class FLZ_AGS_Slot extends FLZ_AGS_Model
     public function __construct(array $data = array())
     {
         parent::__construct($data['id'] ?? null);
+        $this->record_uuid = $data['record_uuid'] ?? null;
         $this->course_id = isset($data['course_id']) ? (int) $data['course_id'] : null;
         $this->school_year = $data['school_year'] ?? null;
         $this->weekday = isset($data['weekday']) ? (int) $data['weekday'] : null;
@@ -136,6 +138,8 @@ class FLZ_AGS_Slot extends FLZ_AGS_Model
             sort_order int(11) NOT NULL DEFAULT 0,
             created_at datetime NOT NULL,
             updated_at datetime NOT NULL,
+            record_uuid char(36) NULL,
+            UNIQUE KEY record_uuid (record_uuid),
             PRIMARY KEY  (id),
             KEY course_id (course_id),
             KEY school_year (school_year),
@@ -146,6 +150,7 @@ class FLZ_AGS_Slot extends FLZ_AGS_Model
 
     protected function prepareDataForSaving(): array
     {
+        $this->record_uuid ??= wp_generate_uuid4();
         if (
             $this->course_id === null || $this->course_id <= 0
             || trim((string) $this->school_year) === ''
@@ -160,6 +165,7 @@ class FLZ_AGS_Slot extends FLZ_AGS_Model
         }
 
         return array(
+            'record_uuid' => $this->record_uuid,
             'course_id' => $this->course_id,
             'school_year' => $this->school_year,
             'weekday' => $this->weekday,
