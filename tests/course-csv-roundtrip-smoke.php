@@ -56,6 +56,7 @@ function flz_ags_csv_assert( bool $condition, string $message ): void {
 }
 
 $course = (object) array(
+	'record_uuid'       => '550e8400-e29b-41d4-a716-446655440000',
 	'id'                => 17,
 	'school_year'       => '2026/2027',
 	'title'             => 'Schach AG',
@@ -74,6 +75,7 @@ $course = (object) array(
 	'sort_order'        => 4,
 );
 $slot = (object) array(
+	'record_uuid'     => '550e8400-e29b-41d4-a716-446655440001',
 	'weekday'         => 2,
 	'start_time'      => '14:00:00',
 	'end_time'        => '15:30:00',
@@ -97,6 +99,8 @@ $parsed = FLZ_AGS_Course_CSV::parse( array_merge( array( FLZ_AGS_Course_CSV::hea
 
 flz_ags_csv_assert( count( $rows ) === 2, 'Der Export enthält nicht genau einen AG- und einen Slot-Datensatz.' );
 flz_ags_csv_assert( isset( $parsed['2026/2027|schach-ag'] ), 'Der Roundtrip erhält den portablen AG-Schlüssel nicht.' );
+flz_ags_csv_assert( $parsed['2026/2027|schach-ag']['course']['record_uuid'] === $course->record_uuid, 'Die AG-Datensatz-ID geht verloren.' );
+flz_ags_csv_assert( $parsed['2026/2027|schach-ag']['slots'][0]['record_uuid'] === $slot->record_uuid, 'Die Termin-Datensatz-ID geht verloren.' );
 flz_ags_csv_assert( count( $parsed['2026/2027|schach-ag']['slots'] ) === 1, 'Der Roundtrip erhält den AG-Slot nicht.' );
 flz_ags_csv_assert( $parsed['2026/2027|schach-ag']['course']['title'] === 'Schach AG', 'Der Roundtrip verändert den AG-Titel.' );
 flz_ags_csv_assert( $parsed['2026/2027|schach-ag']['course']['detail_page_path'] === 'ags/schach-ag', 'Der Roundtrip erhält den portablen Detailseitenpfad nicht.' );
@@ -200,11 +204,11 @@ $repairable_course[4] = 'keine-url';
 $broken_slot = $rows[1];
 $broken_slot[15] = '99:00';
 $tolerant = FLZ_AGS_Course_CSV::parse_tolerant(array(
-	FLZ_AGS_Course_CSV::header(),
-	$repairable_course,
-	$broken_slot,
-	$rows[1],
-	$rows[1],
+	array_slice(FLZ_AGS_Course_CSV::header(), 0, -1),
+	array_slice($repairable_course, 0, -1),
+	array_slice($broken_slot, 0, -1),
+	array_slice($rows[1], 0, -1),
+	array_slice($rows[1], 0, -1),
 ));
 flz_ags_csv_assert( isset( $tolerant['courses']['2026/2027|schach-ag'] ), 'Der fehlertolerante Import verwirft eine reparierbare AG.' );
 flz_ags_csv_assert( $tolerant['courses']['2026/2027|schach-ag']['course']['image_url'] === '', 'Eine ungültige optionale Bild-URL wird nicht sicher geleert.' );

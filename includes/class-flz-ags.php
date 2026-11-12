@@ -2059,7 +2059,11 @@ class FLZ_AGS_Plugin
             }
             $course_data['detail_page_id'] = $detail_page_id;
 
-            $existing_course = $existing_by_key[$key] ?? null;
+            $course_uuid = (string) ($course_data['record_uuid'] ?? '');
+            $existing_course = '' !== $course_uuid ? FLZ_AGS_Course::get_by_fields(array('record_uuid' => $course_uuid)) : ($existing_by_key[$key] ?? null);
+            if ('' !== $course_uuid && isset($existing_by_key[$key]) && (!$existing_course instanceof FLZ_AGS_Course || $existing_by_key[$key]->id !== $existing_course->id)) {
+                throw new UnexpectedValueException('Die Datensatz-ID widerspricht einer vorhandenen AG mit demselben Schlüssel.');
+            }
             $existing_slots = $existing_course instanceof FLZ_AGS_Course
                 ? $this->get_course_slots((int) $existing_course->id, true)
                 : array();
@@ -2084,7 +2088,14 @@ class FLZ_AGS_Plugin
                     $plan['warnings'][] = 'Ein Termin der AG „' . $key . '“ wurde übersprungen: Im vorhandenen Bestand gibt es Wochentag, Zeiten und Raum mehrfach.';
                     continue;
                 }
-                $existing_slot = $existing_slots_by_key[$slot_key] ?? null;
+                $slot_uuid = (string) ($slot_data['record_uuid'] ?? '');
+                $existing_slot = '' !== $slot_uuid ? FLZ_AGS_Slot::get_by_fields(array('record_uuid' => $slot_uuid)) : ($existing_slots_by_key[$slot_key] ?? null);
+                if ($existing_slot instanceof FLZ_AGS_Slot && (!$existing_course instanceof FLZ_AGS_Course || (int) $existing_slot->course_id !== (int) $existing_course->id)) {
+                    throw new UnexpectedValueException('Die Datensatz-ID des Termins gehört zu einer anderen AG.');
+                }
+                if ('' !== $slot_uuid && isset($existing_slots_by_key[$slot_key]) && (!$existing_slot instanceof FLZ_AGS_Slot || $existing_slots_by_key[$slot_key]->id !== $existing_slot->id)) {
+                    throw new UnexpectedValueException('Die Datensatz-ID widerspricht einem vorhandenen AG-Termin.');
+                }
                 $slot_plans[] = array('data' => $slot_data, 'existing' => $existing_slot);
                 $existing_slot instanceof FLZ_AGS_Slot ? ++$plan['slots_updated'] : ++$plan['slots_created'];
             }
@@ -2367,7 +2378,17 @@ class FLZ_AGS_Plugin
                     'created_at' => '' !== $data['created_at'] ? (string) $data['created_at'] : $now,
                     'updated_at' => '' !== $data['updated_at'] ? (string) $data['updated_at'] : $now,
                 );
-                $existing = FLZ_AGS_Registration::find_backup_match($record);
+                $uuid = (string) ($data['record_uuid'] ?? '');
+                $existing = '' !== $uuid
+                    ? FLZ_AGS_Registration::get_by_fields(array('record_uuid' => $uuid))
+                    : FLZ_AGS_Registration::find_backup_match($record);
+                if ('' !== $uuid) {
+                    $matched_by_data = FLZ_AGS_Registration::find_backup_match($record);
+                    if ($matched_by_data instanceof FLZ_AGS_Registration && (!$existing instanceof FLZ_AGS_Registration || $matched_by_data->id !== $existing->id)) {
+                        throw new RuntimeException('Die Datensatz-ID widerspricht einer vorhandenen Anmeldung.');
+                    }
+                    $record['record_uuid'] = $uuid;
+                }
                 if ('active' === $record['status']) {
                     $active = flz_ags_multiple_registrations_enabled()
                         ? FLZ_AGS_Registration::find_active_for_student_in_course(

@@ -60,7 +60,13 @@ function flz_ags_maybe_upgrade(): void
             flz_ags_upgrade_registration_identity_v2();
         }
     }
+    if (version_compare($installed, '2.4.0', '<')) {
+        flz_ags_upgrade_record_uuids();
+    }
     flz_ags_create_model_tables();
+    if (version_compare($installed, '2.4.0', '<')) {
+        flz_ags_upgrade_record_uuids();
+    }
 
     if (version_compare($installed, '2.1.0', '<')) {
         flz_ags_upgrade_leader_assignment_and_multiple_registrations_v21();
@@ -105,6 +111,23 @@ function flz_ags_maybe_upgrade(): void
     delete_option('flz_ags_mock_confirmation_mails');
 
     update_option('flz_ags_db_version', FLZ_AGS_DB_VERSION, false);
+}
+
+function flz_ags_upgrade_record_uuids(): void
+{
+    global $wpdb;
+    foreach (array('flz_ags_courses', 'flz_ags_slots', 'flz_ags_registrations') as $suffix) {
+        $table = $wpdb->prefix . $suffix;
+        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $table)) { throw new RuntimeException('Ungültiger Tabellenname.'); }
+        if ($table !== $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($table)))) { continue; }
+        if (null === $wpdb->get_var($wpdb->prepare('SHOW COLUMNS FROM %i LIKE %s', $table, 'record_uuid')) && false === $wpdb->query($wpdb->prepare('ALTER TABLE %i ADD record_uuid char(36) NULL', $table))) { throw new RuntimeException('Die Datensatz-ID konnte nicht ergänzt werden.'); }
+        $rows = $wpdb->get_results($wpdb->prepare("SELECT id FROM %i WHERE record_uuid IS NULL OR record_uuid = '' ORDER BY id ASC", $table));
+        if (!is_array($rows)) { throw new RuntimeException('Datensätze für die UUID-Migration konnten nicht gelesen werden.'); }
+        foreach ($rows as $row) {
+            if (false === $wpdb->query($wpdb->prepare("UPDATE %i SET record_uuid = %s WHERE id = %d AND (record_uuid IS NULL OR record_uuid = '')", $table, wp_generate_uuid4(), (int) $row->id))) { throw new RuntimeException('Eine Datensatz-ID konnte nicht gespeichert werden.'); }
+        }
+        if (null === $wpdb->get_var($wpdb->prepare('SHOW INDEX FROM %i WHERE Key_name = %s', $table, 'record_uuid')) && false === $wpdb->query($wpdb->prepare('ALTER TABLE %i ADD UNIQUE KEY record_uuid (record_uuid)', $table))) { throw new RuntimeException('Der UUID-Index konnte nicht angelegt werden.'); }
+    }
 }
 
 function flz_ags_create_leader_role(): void
